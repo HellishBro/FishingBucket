@@ -1,0 +1,14 @@
+[project]
+name = "fishing-bucket"
+version = "0.0.1"
+description = "Fluxer proxying bot."
+requires-python = ">=3.14"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "fluxer-py==0.4.1",
+    "typer",
+    "textdistance[DamerauLevenshtein]",
+    "brotli",
+    "cel-python",
+    "expr_dice_roller>=0.0.6"
+]

@@ -1,0 +1,6 @@
+config*
+*.db
+data/emojis.json
+.venv/
+.idea
+uv.lock

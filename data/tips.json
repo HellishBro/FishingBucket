@@ -1,0 +1,13 @@
+[
+  "Experiencing slowness? Use `{prefix}ping` to get the bot's latency!",
+  "When in doubt, check https://fluxerstatus.com.",
+  "Invite the bot by using `{prefix}invite`! Come have a tea and chat!",
+  "Use `{prefix}import` to import from Tupperbox and Pluralkit!",
+  "Feature announcements and polls are in the support community!",
+  "Tips refresh every 5 minutes!",
+  "Group your proxies together by using `{prefix}group add`!",
+  "If your messages aren't going through, it might be a Fluxer problem.",
+  "Rome wasn't made in a day but {config.name} is* (not really).",
+  "Buy me a coffee by running `{prefix}donate`!",
+  "Encountering permission errors? It might be a Fluxer problem!"
+]
