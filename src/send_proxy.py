@@ -10,6 +10,7 @@ from .backend.models import Proxy
 from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
 from .backend.utils import mention_message, convert_attachments, normalize_emojis, roll_dice
+from .response import delete_message
 
 
 def message_matches_trigger(message: str, triggers: list[str]) -> tuple[bool, str]:
@@ -215,4 +216,4 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
             if proxy:
                 await Database.instance.set_user_preferences(message.author.id, last_used_proxy=proxy.id)
 
-            await message.delete()
+            await delete_message(message)
