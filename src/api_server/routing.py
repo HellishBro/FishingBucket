@@ -1,15 +1,20 @@
 from aiohttp.web import Response, Request, AbstractRouteDef, route
 from typing import Awaitable, Callable
 
+from .api_app import Application
+
 type HandlerType = Callable[[Request], Awaitable[Response]]
 
 class RouteTable:
-    def __init__(self, prefix: str = ""):
+    def __init__(self, app: Application, prefix: str = ""):
         self.prefix = prefix
         self.routes: list[AbstractRouteDef] = []
+        self.app = app
 
     def route(self, method: str, path: str, handler: HandlerType, **kwargs):
-        self.routes.append(route(method, ("/" + self.prefix + path).replace("//", "/"), handler, **kwargs))
+        r = route(method, ("/" + self.prefix + path).replace("//", "/"), handler, **kwargs)
+        self.routes.append(r)
+        self.app.app.add_routes([r])
 
     def get(self, path: str, **kwargs):
         def wrapper(handler: HandlerType):

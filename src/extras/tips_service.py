@@ -45,16 +45,3 @@ async def tip_loop(bot: fluxer.Bot, get_ready):
             current_bucket = tips[:]
             random.shuffle(current_bucket)
 
-def run_tip_loop(bot: fluxer.Bot, get_ready):
-    def tl(gr):
-        while True:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(tip_loop(bot, gr))
-            finally:
-                loop.close()
-
-    t = threading.Thread(target=tl, args=(get_ready, ), daemon=True)
-    t.start()
-    print("Started tip loop!")
