@@ -2,7 +2,6 @@ import ast
 import asyncio
 import traceback
 import fluxer
-from asyncio import run as async_run, sleep, iscoroutine
 import time
 
 from .backend.config import Config
@@ -12,6 +11,7 @@ from .interaction import Interactions
 from .backend.cache import CacheStatus
 from . import commands, interactions_impl
 from .commands import command_impl
+from .api_server import app as api_app, ApplicationContext
 
 def run(config_file: str):
     Config(config_file)
@@ -19,13 +19,13 @@ def run(config_file: str):
     DataReader(Config.instance.data_path)
     CacheStatus()
 
-    app = fluxer.Bot(command_prefix=Config.instance.prefixes[0], intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
+    bot = fluxer.Bot(command_prefix=Config.instance.prefixes[0], intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
     Interactions()
     builtin_print = print
 
-    @app.command(name="eval")
+    @bot.command(name="eval")
     async def eval_(message: fluxer.Message):
-        code, = await commands.parse_command(message, [str], app, "eval")
+        code, = await commands.parse_command(message, [str], bot, "eval")
         if int(message.author.id) in Config.instance.devs:
             try:
                 comp = compile(code, "<string>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
@@ -36,7 +36,7 @@ def run(config_file: str):
                     _output.append(" ".join(str(arg) for arg in args))
 
                 res = eval(comp, globals(), locals())
-                if iscoroutine(res):
+                if asyncio.iscoroutine(res):
                     await res
 
                 returned = "\n".join(_output)
@@ -48,28 +48,40 @@ def run(config_file: str):
                 f"**Input**\n```py\n{code}\n```\n\n**Output**\n```\n{returned[:min(len(returned), 1000)]}\n```"
             ).to_dict()])
 
-            await sleep(30)
+            await asyncio.sleep(30)
             await message.delete()
             await m.delete()
 
     if Config.instance.use_extras:
         from .extras.down_runner import report_bot
-        from .extras.tips_service import run_tip_loop
     else:
         from .extras.nothing import no_op_coro as report_bot
-        from .extras.nothing import no_op_func as run_tip_loop
 
-    run_tip_loop(app, lambda: interactions_impl.ready)
+    async def run_once():
+        starts = [asyncio.Future(), bot.start(Config.instance.token), api_app.serve()]
+        if Config.instance.use_extras:
+            from .extras.tips_service import tip_loop
+            starts.append(tip_loop(bot, lambda: interactions_impl.ready))
+
+        try:
+            await asyncio.gather(*starts)
+        finally:
+            await asyncio.gather(
+                api_app.close(),
+                bot.close()
+            )
+
     attempts = 0
     while True:
         print("Trying to connect...")
         start_time = time.time()
         err = None
         try:
-            async_run(Database.instance.init())
-            command_impl.setup(app)
-            interactions_impl.setup(app)
-            app.run(Config.instance.token)
+            asyncio.run(Database.instance.init())
+            command_impl.setup(bot)
+            interactions_impl.setup(bot)
+            api_app.set_context(ApplicationContext(Database.instance))
+            asyncio.run(run_once())
         except KeyboardInterrupt:
             quit()
         except Exception as e:
@@ -87,9 +99,9 @@ def run(config_file: str):
         session_time = time.time() - start_time
         wait_sec = 10 + 10 * min(attempts, 30)
         print(f"Resetting... error: {err}. Session time: {session_time:.2f}s, readied? {interactions_impl.ready}. Connection attempt {attempts}. Waiting for {wait_sec} seconds.")
-        async_run(Database.instance.close())
+        asyncio.run(Database.instance.close())
         commands.clear()
-        interactions_impl.clear(app)
+        interactions_impl.clear(bot)
 
         error_guess = err.__class__.__name__
         status = "down."
@@ -104,7 +116,7 @@ def run(config_file: str):
             status = f"Fluxer API timeout. Retrying connection in {wait_sec} seconds."
 
         print(f"Error guess: {error_guess}, status: {status}")
-        async_run(report_bot("down", status))
+        asyncio.run(report_bot("down", status))
 
         time.sleep(wait_sec)
         print("Retrying connect...")
