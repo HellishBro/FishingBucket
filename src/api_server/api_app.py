@@ -16,7 +16,9 @@ class Application:
         self.ready = True
 
     @staticmethod
-    def respond_json(obj: dict) -> Response:
+    def respond_json(obj: dict | None) -> Response:
+        if obj is None:
+            return Response(text="404", status=404)
         return Response(body=json.dumps(obj), content_type="application/json")
 
     async def serve(self, host = "localhost", port = 8080):
@@ -25,6 +27,7 @@ class Application:
         await self.runner.setup()
         site = TCPSite(self.runner, host, port)
         await site.start()
+        print("API server is running!")
 
     async def close(self):
         await self.runner.cleanup()
