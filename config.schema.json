@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "token",
+    "devs",
+    "name",
+    "hq_server_invite",
+    "hq_server_id",
+    "bot_invite_link",
+    "prefixes",
+    "database",
+    "api",
+    "data",
+    "use_extras"
+  ],
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "The bot's client token."
+    },
+    "devs": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "description": "A developer's user ID."
+      },
+      "description": "A list of developers working on this bot. Enables some developer commands and states."
+    },
+    "name": {
+      "type": "string",
+      "description": "The name for this bot."
+    },
+    "hq_server_invite": {
+      "type": "string",
+      "format": "uri",
+      "description": "The invite link for the headquarter or support community."
+    },
+    "hq_server_id": {
+      "type": "integer",
+      "description": "The ID of the headquarter or support community."
+    },
+    "bot_invite_link": {
+      "type": "string",
+      "format": "uri",
+      "description": "The invite link to invite the bot."
+    },
+    "prefixes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "A command prefix to respond to."
+      },
+      "description": "A list of command prefixes to respond to."
+    },
+    "database": {
+      "type": "string",
+      "description": "The path (absolute preferred) to the database file."
+    },
+    "api": {
+      "type": "string",
+      "format": "uri",
+      "description": "The path to the Fluxer API endpoint."
+    },
+    "data": {
+      "type": "string",
+      "description": "The path (absolute preferred) to the data directory."
+    },
+    "use_extras": {
+      "type": "boolean",
+      "description": "Enable if you want the bot to use extra plugin features."
+    },
+
+    "donation": {
+      "type": "string",
+      "format": "uri",
+      "description": "Your donation link."
+    },
+    "user_token": {
+      "type": "string",
+      "description": "The token of the user who owns the bot in the Applications page. Used for setting bot bio."
+    },
+    "client_id": {
+      "type": "integer",
+      "description": "The bot's own user ID."
+    },
+    "bio": {
+      "type": "object",
+      "description": "A mapping of the bot's bio states.",
+      "additionalProperties": {
+        "type": "string",
+        "description": "A Template to set for the bot's bio."
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "use_extras": {
+            "const": true
+          }
+        },
+        "then": {
+          "required": [
+            "donation",
+            "user_token",
+            "client_id",
+            "bio"
+          ]
+        }
+      }
+    }
+  ],
+  "additionalProperties": true
+}
