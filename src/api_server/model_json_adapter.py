@@ -7,6 +7,8 @@ def to_json(obj: Any) -> dict:
         return _to_json_proxy(obj)
     elif isinstance(obj, ProxyGroup):
         return _to_json_proxygroup(obj)
+    elif obj is None:
+        return None
     return {
         "error": f"unknown type: {obj.__class__.__name__}"
     }
