@@ -2,6 +2,8 @@ from typing import Callable, Any
 import celpy
 from dataclasses import dataclass
 
+from rapidfuzz.process_py import extractOne
+
 from .cache import TTLCache
 
 
@@ -43,27 +45,41 @@ class Template:
         current_content = ""
         braces = 0
         errors = []
+        string_mode = False
+        prev = "\0"
         for char in string:
-            if char == "{":
-                braces += 1
-                if braces == 1:
-                    parts.append(TextPart(current_content))
-                    current_content = ""
-                    continue
-            elif char == "}":
-                braces -= 1
-                if braces == 0:
-                    c = ExprPart
-                    if current_content:
-                        try:
-                            comp_env.compile(current_content)
-                        except celpy.CELParseError as e:
-                            c = TextPart
-                            errors.append(f"Cannot parse part {current_content!r} due to {e.args[0]!r}.")
-                    parts.append(c(current_content))
-                    current_content = ""
-                    continue
+            if not string_mode and char in '"\'`':
+                string_mode = char
+            elif string_mode == char and prev != "\\":
+                string_mode = False
+
+            if not string_mode:
+                if char == "{":
+                    braces += 1
+                    if braces == 1:
+                        parts.append(TextPart(current_content))
+                        current_content = ""
+                        continue
+                elif char == "}":
+                    braces -= 1
+                    if braces == 0:
+                        c = ExprPart
+                        if current_content:
+                            if current_content.startswith("`") and current_content.endswith("`"):
+                                parts.append(TextPart(current_content[1:-1]))
+                                current_content = ""
+                                continue
+                            try:
+                                comp_env.compile(current_content)
+                            except celpy.CELParseError as e:
+                                c = TextPart
+                                errors.append(f"Cannot parse part {current_content!r} due to {e.args[0]!r}.")
+                        parts.append(c(current_content))
+                        current_content = ""
+                        continue
             current_content += char
+            prev = char
+
         if braces != 0:
             errors.append("Unclosed open brace.")
 
