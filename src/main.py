@@ -80,7 +80,7 @@ def run(config_file: str):
             asyncio.run(Database.instance.init())
             command_impl.setup(bot)
             interactions_impl.setup(bot)
-            api_app.set_context(ApplicationContext(Database.instance))
+            api_app.set_context(ApplicationContext(Database.instance, Config.instance))
             asyncio.run(run_once())
         except KeyboardInterrupt:
             quit()

@@ -1,7 +1,8 @@
-import json
-from aiohttp.web import Application as aiohttpApp, AppRunner, Response
-from aiohttp.web_runner import TCPSite
+from typing import Callable, Awaitable
 
+from aiohttp.web import Application as aiohttpApp, AppRunner, Response, Request, HTTPForbidden, TCPSite
+
+from .api_database import Database, Session
 from .context import ApplicationContext
 
 class Application:
@@ -14,17 +15,13 @@ class Application:
     def set_context(self, context: ApplicationContext):
         self.context = context
         self.ready = True
-
-    @staticmethod
-    def respond_json(obj: dict | None) -> Response:
-        if obj is None:
-            return Response(text="404", status=404)
-        return Response(body=json.dumps(obj), content_type="application/json")
+        Database(self.context.config.api_server.database)
 
     async def serve(self):
         if not self.ready:
             raise Exception("Application is not ready yet!")
 
+        await Database.instance.init()
         config = self.context.config
         host, port = config.api_server.domain, config.api_server.port
         await self.runner.setup()
@@ -35,3 +32,18 @@ class Application:
     async def close(self):
         await self.runner.cleanup()
         self.ready = False
+
+    @staticmethod
+    def require_session(function: Callable[[Request, Session], Awaitable[Response]]):
+        async def inner(request: Request) -> Response:
+            if "Authorization" in request.headers:
+                auth = request.headers["Authorization"]
+            else:
+                raise HTTPForbidden()
+
+            session = await Database.instance.get_session(auth)
+            if not session:
+                raise HTTPForbidden()
+
+            return await function(request, session)
+        return inner

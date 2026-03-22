@@ -8,6 +8,7 @@ class ApiServer:
     client_secret: str
     client_id: int
     url: str
+    database: str
 
 
 class Config:
