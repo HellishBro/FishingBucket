@@ -81,11 +81,15 @@ class Proxy:
 
         return cls(data[0], data[1], data[2], data[3], data[4].split("\n"), data[5], data[6], data[7], group, data[9])
 
+    @staticmethod
+    def process_trigger_part(part: str) -> str:
+        return part.replace("{", "\\}").replace("}", "\\}")
+
     @classmethod
     def from_tupper(cls, tupper: dict, owner: int, groups: dict[int, ProxyGroup]) -> Proxy:
         brackets = []
         for i in range(0, len(tupper["brackets"]), 2):
-            brackets.append(tupper["brackets"][i] + "{}" + tupper["brackets"][i + 1])
+            brackets.append(cls.process_trigger_part(tupper["brackets"][i]) + "{}" + cls.process_trigger_part(tupper["brackets"][i + 1]))
 
         nick = tupper.get("nick")
         if tag := tupper.get("tag"):
@@ -114,7 +118,7 @@ class Proxy:
             pluralkit["name"],
             pluralkit["description"] or "",
             pluralkit["avatar_url"] or Proxy.random_avatar(),
-            [(i["prefix"] or "") + "{}" + (i["suffix"] or "") for i in pluralkit["proxy_tags"]] or [],
+            [cls.process_trigger_part(i["prefix"] or "") + "{}" + cls.process_trigger_part(i["suffix"] or "") for i in pluralkit["proxy_tags"]] or [],
             owner,
             pluralkit["message_count"],
             datetime.fromisoformat(pluralkit["created"]).timestamp() if pluralkit["created"] else time.time(),

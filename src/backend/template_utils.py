@@ -47,28 +47,28 @@ class Template:
         errors = []
         string_mode = False
         prev = "\0"
+        escaped = 0
         for char in string:
-            if not string_mode and char in '"\'`':
+            if char == "\\" and escaped == 0:
+                escaped = 2
+
+            if not string_mode and char in '"\'':
                 string_mode = char
             elif string_mode == char and prev != "\\":
                 string_mode = False
 
             if not string_mode:
-                if char == "{":
+                if char == "{" and escaped == 0:
                     braces += 1
                     if braces == 1:
                         parts.append(TextPart(current_content))
                         current_content = ""
                         continue
-                elif char == "}":
+                elif char == "}" and escaped == 0:
                     braces -= 1
                     if braces == 0:
                         c = ExprPart
                         if current_content:
-                            if current_content.startswith("`") and current_content.endswith("`"):
-                                parts.append(TextPart(current_content[1:-1]))
-                                current_content = ""
-                                continue
                             try:
                                 comp_env.compile(current_content)
                             except celpy.CELParseError as e:
@@ -77,8 +77,11 @@ class Template:
                         parts.append(c(current_content))
                         current_content = ""
                         continue
-            current_content += char
+            if escaped != 2:
+                current_content += char
             prev = char
+            if escaped > 0:
+                escaped -= 1
 
         if braces != 0:
             errors.append("Unclosed open brace.")
@@ -88,6 +91,7 @@ class Template:
         for part in parts:
             if isinstance(part, TextPart):
                 if part.content:
+                    part.content = part.content.replace("\\\\", "\\").replace("\\{", "{").replace("\\}", "}")
                     previous_part = simplified[-1] if len(simplified) != 0 else None
                     if isinstance(previous_part, TextPart):
                         simplified[-1].content += part.content
