@@ -99,6 +99,13 @@ def setup(bot: fluxer.Bot):
                 await remove_reaction(msg, "🔔", event.user_id)
                 await response.respond(msg, f"<@{prox.owner}>, <@{event.user_id}> has pinged you! Use :x: to delete this message (expires in 5 minutes).", user_id_override=prox.owner)
 
+    @bot.event
+    async def on_message_delete(data: dict):
+        channel_id, message_id = int(data["channel_id"]), int(data["id"])
+        proxy_id = await Database.instance.get_proxy_id(message_id, channel_id)
+        if proxy_id:
+            await Database.instance.delete_link_message(message_id, channel_id)
+
 
 def clear(bot: fluxer.Bot):
     bot._event_handlers.clear()
