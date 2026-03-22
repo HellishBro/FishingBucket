@@ -91,6 +91,38 @@
         "type": "string",
         "description": "A Template to set for the bot's bio."
       }
+    },
+    "api_server": {
+      "type": "object",
+      "description": "Configuration for the API server.",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "format": "uri",
+          "description": "The domain to start the API server in."
+        },
+        "port": {
+          "type": "integer",
+          "description": "The port to start the API server in."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "The API URL."
+        },
+        "client_secret": {
+          "type": "string",
+          "description": "The auth application's client secret."
+        },
+        "client_id": {
+          "type": "integer",
+          "description": "The auth application's client ID."
+        },
+        "database": {
+          "type": "string",
+          "description": "The path (absolute preferred) to the API database file."
+        }
+      }
     }
   },
   "allOf": [
@@ -106,7 +138,8 @@
             "donation",
             "user_token",
             "client_id",
-            "bio"
+            "bio",
+            "api_server"
           ]
         }
       }

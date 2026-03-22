@@ -21,9 +21,12 @@ class Application:
             return Response(text="404", status=404)
         return Response(body=json.dumps(obj), content_type="application/json")
 
-    async def serve(self, host = "localhost", port = 8080):
+    async def serve(self):
         if not self.ready:
             raise Exception("Application is not ready yet!")
+
+        config = self.context.config
+        host, port = config.api_server.domain, config.api_server.port
         await self.runner.setup()
         site = TCPSite(self.runner, host, port)
         await site.start()

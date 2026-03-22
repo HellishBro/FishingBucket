@@ -25,9 +25,9 @@ async def _(request: Request) -> Response:
         payload = {
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": "http://localhost:8080/api/v1/redirect",
-            "client_id": 1483307071562336131,
-            "client_secret": "AP2bybXYStn7lMt7bs7i3Due1jLSVraERxnm1mzJMFM"
+            "redirect_uri": f"{app.context.config.api_server.url}/api/v1/redirect",
+            "client_id": app.context.config.api_server.client_id,
+            "client_secret": app.context.config.api_server.client_secret
         }
         form_data = aiohttp.FormData(payload)
         async with session.post("https://api.fluxer.app/v1/oauth2/token", data=form_data) as resp:

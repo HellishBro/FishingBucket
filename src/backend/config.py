@@ -1,4 +1,14 @@
 import json
+from dataclasses import dataclass
+
+@dataclass
+class ApiServer:
+    domain: str
+    port: int
+    client_secret: str
+    client_id: int
+    url: str
+
 
 class Config:
     instance: Config
@@ -19,6 +29,7 @@ class Config:
     user_token: str | None
     bot_client_id: int | None
     bot_bios: dict[str, str] | None
+    api_server: ApiServer | None
 
     _fields_map = {
         "token": "token",
@@ -36,6 +47,7 @@ class Config:
         "?user_token": "user_token",
         "?client_id": "bot_client_id",
         "?bio": "bot_bios",
+        "?api_server": "api_server"
     }
 
     def __init__(self, filename: str = "config.json"):
@@ -47,7 +59,10 @@ class Config:
                     k = k[1:]
                     optional = True
                 if k in conf:
-                    setattr(self, v, conf[k])
+                    if k == "api_server":
+                        setattr(self, v, ApiServer(**conf[k]))
+                    else:
+                        setattr(self, v, conf[k])
                 elif not optional:
                     raise KeyError(f"Cannot find key {k!r} in config.json!")
                 else:
