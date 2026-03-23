@@ -154,8 +154,8 @@ async def parse_type(message: fluxer.Message, final: bool, stream: PeekableConsu
         f"Unrecognized type: {current_type.__name__ if hasattr(current_type, '__name__') else current_type.__class__.__name__}.")
 
 
-async def parse_command(message: fluxer.Message, shape: list[command_types], bot: fluxer.Bot, command_name: str) -> list[Any]:
-    stripped = message.content[len(bot.command_prefix):].strip()[len(command_name):].strip()
+async def parse_command(message: fluxer.Message, shape: list[command_types], bot: fluxer.Bot, command_name: str, prefix_used: str) -> list[Any]:
+    stripped = message.content[len(prefix_used):].strip()[len(command_name):].strip()
     stream = PeekableConsumable(stripped)
     converted = []
     for i, current_type in enumerate(shape):
@@ -182,10 +182,10 @@ def register_group(id_: str, name: str, description: str):
 
 class CommandList:
     def __init__(self):
-        self.registry: dict[str, Callable[[fluxer.Message, str], Coroutine[None, None, None]]] = {}
+        self.registry: dict[str, Callable[[fluxer.Message, str, str], Coroutine[None, None, None]]] = {}
         self.aliases: dict[str, str] = {}
 
-    def register(self, command_name: str, aliases: list[str], handler: Callable[[fluxer.Message, str], Coroutine[None, None, None]]):
+    def register(self, command_name: str, aliases: list[str], handler: Callable[[fluxer.Message, str, str], Coroutine[None, None, None]]):
         self.registry[command_name] = handler
         self.registry = dict(sorted(self.registry.items(), key=lambda kv: len(kv[0]), reverse=True))
         for alias in aliases:
@@ -219,7 +219,7 @@ def register_command(shape: list[command_types], bot: fluxer.Bot, command_name: 
         c = Command(shape, command_name, command_description, command_usage, examples)
         command_groups[group_id].register(c)
 
-        async def wrapper(m: fluxer.Message, cmd_name: str):
+        async def wrapper(m: fluxer.Message, cmd_name: str, prefix_used: str):
             global session_command_usages
             for u, t in [*users_cd_list.items()]:
                 if t <= time.time() - 120:
@@ -231,7 +231,7 @@ def register_command(shape: list[command_types], bot: fluxer.Bot, command_name: 
                 return
 
             try:
-                parsed = await parse_command(m, shape, bot, cmd_name)
+                parsed = await parse_command(m, shape, bot, cmd_name, prefix_used)
             except ValueError as e:
                 await m.reply(
                     f"Error parsing command! {e.args[0]}\nUse `{bot.command_prefix}help {command_name}` for further information.")
