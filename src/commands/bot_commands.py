@@ -23,7 +23,7 @@ def setup(bot: fluxer.Bot):
     Provides information about this bot or about a command.
     Optional argument `command`. If provided, it will show the command description, usage, as well as examples.
     If instead, a `page` is provided, it will show that page of the help menu.
-    """, "help [command OR page]", ["help", "help help", "help register", "help 2"], "bot")
+    """, "help [command OR page]", ["help", "help help", "help register", "help 2"], "bot", ["", "h", "?"])
     async def help_(message: fluxer.Message, command_or_page: str | int | None):
         if isinstance(command_or_page, str):
             command = command_or_page
@@ -72,7 +72,7 @@ def setup(bot: fluxer.Bot):
     @register_command([optional_type(fluxer.Channel)], bot, "permissions", """
     Checks the bot's permissions.
     The permissions are required for this bot to function properly. If some permissions are missing, then that functionality will not work as expected.
-    """, "permissions [channel]", ["permissions", "permissions #general"], "bot")
+    """, "permissions [channel]", ["permissions", "permissions #general"], "bot", ["perms"])
     async def permissions(message: fluxer.Message, channel: fluxer.Channel | None):
         if channel is None:
             channel = await bot.fetch_channel(str(message.channel_id))
@@ -108,7 +108,7 @@ def setup(bot: fluxer.Bot):
     @register_command([optional_type(str)], bot, "stats", """
     Gets global statistics about the bot.
     If provided, `stat` will return only that specific statistic.
-    """, "stats [stat]", ["stats", "stats proxy_uses"], "bot")
+    """, "stats [stat]", ["stats", "stats proxy_uses"], "bot", ["stat"])
     async def stats(message: fluxer.Message, stat: str | None):
         all_stats: dict[str, Any] = await Database.instance.get_global_stats()
         all_stats.update({

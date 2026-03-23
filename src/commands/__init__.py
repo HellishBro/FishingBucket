@@ -182,11 +182,15 @@ def register_group(id_: str, name: str, description: str):
 
 class CommandList:
     def __init__(self):
-        self.registry: dict[str, Callable[[fluxer.Message], Coroutine[None, None, None]]] = {}
+        self.registry: dict[str, Callable[[fluxer.Message, str], Coroutine[None, None, None]]] = {}
+        self.aliases: dict[str, str] = {}
 
-    def register(self, command_name: str, handler: Callable[[fluxer.Message], Coroutine[None, None, None]]):
+    def register(self, command_name: str, aliases: list[str], handler: Callable[[fluxer.Message, str], Coroutine[None, None, None]]):
         self.registry[command_name] = handler
         self.registry = dict(sorted(self.registry.items(), key=lambda kv: len(kv[0]), reverse=True))
+        for alias in aliases:
+            self.aliases[alias] = command_name
+            self.aliases = dict(sorted(self.aliases.items(), key=lambda kv: len(kv[0]), reverse=True))
 
     def clear(self):
         self.registry.clear()
@@ -208,14 +212,14 @@ def clear():
 
 
 def register_command(shape: list[command_types], bot: fluxer.Bot, command_name: str, command_description: str,
-                     command_usage: str, examples: list[str], group_id: str):
+                     command_usage: str, examples: list[str], group_id: str, aliases: list[str] = None):
     command_description = "\n".join(line.strip() for line in command_description.strip().split("\n"))
 
     def decorator(f: Callable[[fluxer.Message, ...], Coroutine[None, None, None]]):
         c = Command(shape, command_name, command_description, command_usage, examples)
         command_groups[group_id].register(c)
 
-        async def wrapper(m: fluxer.Message):
+        async def wrapper(m: fluxer.Message, cmd_name: str):
             global session_command_usages
             for u, t in [*users_cd_list.items()]:
                 if t <= time.time() - 120:
@@ -227,7 +231,7 @@ def register_command(shape: list[command_types], bot: fluxer.Bot, command_name: 
                 return
 
             try:
-                parsed = await parse_command(m, shape, bot, command_name)
+                parsed = await parse_command(m, shape, bot, cmd_name)
             except ValueError as e:
                 await m.reply(
                     f"Error parsing command! {e.args[0]}\nUse `{bot.command_prefix}help {command_name}` for further information.")
@@ -243,7 +247,7 @@ def register_command(shape: list[command_types], bot: fluxer.Bot, command_name: 
                 if author in users_cd_list:
                     users_cd_list.pop(author)
 
-        command_list.register(command_name, wrapper)
+        command_list.register(command_name, aliases or [], wrapper)
         return wrapper
 
     return decorator

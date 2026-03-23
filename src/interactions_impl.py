@@ -48,7 +48,11 @@ def setup(bot: fluxer.Bot):
                 command = message.content[len(prefix):].strip()
                 for cmd, handler in command_list.registry.items():
                     if command.startswith(cmd):
-                        await handler(message)
+                        await handler(message, cmd)
+                        return
+                for alias, cmd in command_list.aliases.items():
+                    if command.startswith(alias):
+                        await command_list.registry[cmd](message, alias)
                         return
                 await response.respond(message, f"`{command}` is not recognized as a valid command! Use `{bot.command_prefix}help` to view all commands!")
                 return

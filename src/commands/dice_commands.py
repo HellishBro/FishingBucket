@@ -22,7 +22,7 @@ def setup(bot: fluxer.Bot):
 
     @register_command([str], bot, "dice", """
     Rolls dice.
-    """, "dice <roll>", ["dice d6", "dice 2d20d1"], "dice")
+    """, "dice <roll>", ["dice d6", "dice 2d20d1"], "dice", ["d"])
     async def dice_roll(message: fluxer.Message, roll: str):
         guild_id = (await bot.fetch_channel(str(message.channel_id))).guild_id
         user_fns = (await Database.instance.get_user_preferences(message.author.id)).dice_functions
