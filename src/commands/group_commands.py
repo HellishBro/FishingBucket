@@ -58,7 +58,7 @@ def setup(bot: fluxer.Bot):
     @register_command([str, one_or_more(str)], bot, "group add", """
     Adds proxies to a proxy group.
     Each proxy can only belong in one proxy group. To remove a proxy from its group, use `group ungroup`.
-    """, '"group add <group> <proxy(s)>"', ["group add 2d7 69ed73"], "group")
+    """, 'group add <group> <proxy(s)>', ["group add 2d7 69ed73"], "group")
     async def group_add(message: fluxer.Message, group_id: str, proxy_ids: list[str]):
         if not (group := await ensure_own_group(message, group_id)): return
         proxies = []
@@ -80,7 +80,7 @@ def setup(bot: fluxer.Bot):
     @register_command([str, one_or_more(str)], bot, "group add group", """
     Adds groups to a proxy group.
     This enables nested groups. To remove a group from its group, use `group ungroup group`.
-    """, '"group add group <group> <group(s)>"', ["group add 2d7 2d8 2d9"], "group")
+    """, 'group add group <group> <group(s)>', ["group add 2d7 2d8 2d9"], "group")
     async def group_add_group(message: fluxer.Message, group_id: str, group_ids: list[str]):
         if not (group := await ensure_own_group(message, group_id)): return
         groups = []
