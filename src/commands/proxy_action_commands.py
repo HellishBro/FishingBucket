@@ -58,23 +58,20 @@ def setup(bot: fluxer.Bot):
         embed.set_thumbnail(url=avatar_url)
         await response.respond(message, "", [embed])
 
-    @register_command([str, alternative("set", "add", "remove"), optional_type(one_or_more(str))], bot, "set triggers", """
+    @register_command([str, alternative("set", "add", "remove"), optional_type(str)], bot, "set triggers", """
     Updates a proxy's triggers.
     The `new trigger` argument will be used to trigger your proxy after changing it.
     Like the register command, there must be at least one trigger.
-    If the mode is set to `set`, then the `trigger(s)` parameter is optional, and it will replace all previous triggers. If there's no triggers, then the proxy cannot be used through regular means.
-    If the mode is set to `add`, then the `trigger(s)` parameter is required, and it will be appended to the trigger list.
-    If the mode is set to `remove`, then it will try to remove all matching `trigger(s)` from the trigger list, and if none is supplied, it will remove all triggers.
-    """, 'set triggers <proxy> <"set" OR "add" OR "remove"> [trigger(s)]',
-                      ['set triggers 69ed73 add "egg: {}"', 'set triggers 69ed73 set hi{}! "hi! {}"', 'set triggers 69ed73 remove hi{}!', 'set triggers 69ed73 remove', 'set triggers 69ed73 set'], "proxy_act")
-    async def change_triggers(message: fluxer.Message, id_: str, mode: str, triggers: list[str] | None):
-        triggers = triggers or []
+    If the mode is set to `set`, then the `trigger` parameter is optional, and it will replace all previous triggers. If there's no triggers, then the proxy cannot be used through regular means.
+    If the mode is set to `add`, then the `trigger` parameter is required, and it will be appended to the trigger list.
+    If the mode is set to `remove`, then it will try to remove `trigger` from the trigger list, and if none is supplied, it will remove all triggers.
+    """, 'set triggers <proxy> <"set" OR "add" OR "remove"> [trigger]',
+                      ['set triggers 69ed73 add egg: {}', 'set triggers 69ed73 set hi{}!', 'set triggers 69ed73 remove hi{}!', 'set triggers 69ed73 remove', 'set triggers 69ed73 set'], "proxy_act")
+    async def change_triggers(message: fluxer.Message, id_: str, mode: str, trigger: str | None):
+        if not await valid_template(message, "Trigger", trigger):
+            return
 
-        for trig in triggers:
-            if not await valid_template(message, "Trigger", trig):
-                return
-
-        if mode == "add" and len(triggers) == 0:
+        if mode == "add" and trigger is None:
             await response.respond(message, 'Error! "add" mode must have triggers to add!')
             return
 
@@ -83,13 +80,12 @@ def setup(bot: fluxer.Bot):
 
         new_triggers = proxy.triggers
         if mode == "set":
-            new_triggers = triggers
+            new_triggers = [trigger]
         elif mode == "remove":
-            for trig in triggers:
-                if trig in new_triggers:
-                    new_triggers.remove(trig)
+            if trigger in new_triggers:
+                new_triggers.remove(trigger)
         elif mode == "add":
-            new_triggers.extend(triggers)
+            new_triggers.append(trigger)
             new_triggers = [*set(new_triggers)]
 
         await Database.instance.update_trigger(proxy.id, new_triggers)
