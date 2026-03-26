@@ -31,12 +31,16 @@ async def tip_loop(bot: fluxer.Bot, get_ready):
                 d = {
                     "status": "online",
                     "custom_status": {
-                        "text": parsed
-                    }
+                        "text": parsed,
+                        "emoji_name": "",
+                        "emoji_id": ""
+                    },
+                    "since": None,
+                    "afk": False
                 }
             ))
 
-            await report_bot("tip", parsed)
+            # await report_bot("tip", parsed)
             await asyncio.sleep(refresh_timer)
         else:
             await asyncio.sleep(10)
