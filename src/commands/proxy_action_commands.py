@@ -4,6 +4,7 @@ from fluxer.models import RawReactionActionEvent
 from .utils import proxy_username, ensure_own_proxy, valid_template, example_trigger_text
 from .. import response
 from ..backend.database import Database
+from ..backend.utils import normalize_emojis
 from ..commands import register_command, register_group
 from ..interaction import Interaction, remove_reaction, Interactions
 from ..backend.models import optional_type, one_or_more, Proxy, alternative
@@ -106,6 +107,7 @@ def setup(bot: fluxer.Bot):
         if not proxy: return
 
         old_name = proxy.name
+        new_name = normalize_emojis(new_name)
         await Database.instance.update_name(proxy.id, new_name)
         embed = fluxer.Embed(
             "Proxy Updated!",
@@ -124,6 +126,7 @@ def setup(bot: fluxer.Bot):
         if not proxy: return
 
         old_name = proxy.name
+        new_nickname = normalize_emojis(new_nickname)
         await Database.instance.update_nickname(proxy.id, new_nickname)
         embed = fluxer.Embed(
             "Proxy Updated!",
