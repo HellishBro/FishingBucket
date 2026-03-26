@@ -92,7 +92,7 @@ def setup(bot: fluxer.Bot):
         await Database.instance.update_trigger(proxy.id, new_triggers)
         embed = fluxer.Embed(
             "Proxy Updated!",
-            f"The trigger for **{proxy.name}** has been changed to {', '.join('`' + trigger + '`' for trigger in new_triggers)}!\nSay hello with it by typing `{example_trigger_text(triggers[0])}`{' or by other triggers' if len(new_triggers) != 1 else ''}!"
+            f"The trigger for **{proxy.name}** has been changed to {', '.join('`' + trigger + '`' for trigger in new_triggers)}!\nSay hello with it by typing `{example_trigger_text(new_triggers[0])}`{' or by other triggers' if len(new_triggers) != 1 else ''}!"
         )
         await response.respond(message, "", [embed])
 
