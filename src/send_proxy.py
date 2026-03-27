@@ -157,7 +157,7 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
 def recover_original_message(message: fluxer.Message) -> str:
     replying = any(embed["title"] == "Reply" for embed in message.embeds)
     if replying:
-        pre, old_msg = message.content.split("\n", maxsplit=2)
+        pre, old_msg = message.content.split("\n", maxsplit=1)
         return old_msg
     return message.content
 
@@ -172,7 +172,7 @@ async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_m
     contents, embeds = await modify_message(proxy.owner, server_preferences, new_message_contents, embeds)
     old_msg = old_message.content
     if replying:
-        pre, old_msg = old_message.content.split("\n", maxsplit=2)
+        pre, old_msg = old_message.content.split("\n", maxsplit=1)
         contents = pre + "\n" + contents
     m = await edit_webhook(webhook, bot, old_message, contents, embeds)
     logging_channel_id = server_preferences.logging_channel
