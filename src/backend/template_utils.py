@@ -2,8 +2,6 @@ from typing import Callable, Any
 import celpy
 from dataclasses import dataclass
 
-from rapidfuzz.process_py import extractOne
-
 from .cache import TTLCache
 
 
