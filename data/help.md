@@ -13,6 +13,7 @@ To remove a proxy, use `{bot.command_prefix}remove`!
 - React to a proxied message that you've sent with :x: to delete it!
 - React to a proxied message with :question: to see who was behind that message!
 - React to a proxied message with :bell: to ping the user behind that message!
+- React to a proxied message with :memo: to edit the proxied message!
 
 You can also use :x: to any command response that you've triggered to delete the response!
 Invite me, or see the support community by running `{bot.command_prefix}invite`!

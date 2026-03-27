@@ -118,11 +118,14 @@ async def get_member(guild_id: int, bot: fluxer.Bot, user_id: int) -> fluxer.mod
     return fluxer.models.GuildMember.from_data(await bot._http.request(fhttp.Route("GET", "/guilds/{gid}/members/{uid}", gid=str(guild_id), uid=str(user_id))), bot._http)
 
 
-async def edit_webhook(webhook: fluxer.Webhook, bot: fluxer.Bot, message: fluxer.Message, new_contents: str):
-    await bot._http.request(fhttp.Route("PATCH", "/webhooks/{wid}/{wtk}/messages/{mid}", wid=webhook.id, wtk=webhook.token, mid=message.id), json={
-        "content": new_contents,
-        "embeds": message.embeds
-    })
+async def edit_webhook(webhook: fluxer.Webhook, bot: fluxer.Bot, message: fluxer.Message, new_contents: str, embeds: list[dict] | None) -> fluxer.Message:
+    return fluxer.Message.from_data(
+        await bot._http.request(fhttp.Route("PATCH", "/webhooks/{wid}/{wtk}/messages/{mid}", wid=webhook.id, wtk=webhook.token, mid=message.id), json={
+            "content": new_contents,
+            "embeds": embeds or []
+        }),
+        bot._http
+    )
 
 async def convert_attachments(message_attachments: list[fluxer.models.Attachment]) -> list[fluxer.File]:
     parsed_attachments = []

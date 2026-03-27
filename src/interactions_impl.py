@@ -1,10 +1,12 @@
+import asyncio
+
 import fluxer
 from fluxer.models import RawReactionActionEvent
 
 from .interaction import Interactions, message_reactions, remove_reaction
 from .commands import command_list
 from .backend.database import Database
-from .send_proxy import on_user_message
+from .send_proxy import on_user_message, recover_original_message, edit_proxy_message
 from .backend.config import Config
 from .backend.utils import mention_message
 from . import response
@@ -26,6 +28,8 @@ def setup(bot: fluxer.Bot):
     global ready
     ready = False
 
+    editing_messages: dict[int, tuple[int, int]] = {} # user_id => (channel_id, message_id)
+
     @bot.event
     async def on_ready():
         global ready
@@ -41,6 +45,13 @@ def setup(bot: fluxer.Bot):
     async def on_message(message: fluxer.Message):
         if message.author.id == bot.user.id: return
         if message.author.bot: return
+
+        if message.author.id in editing_messages:
+            channel_id, message_id = editing_messages.pop(message.author.id)
+            msg = await bot.fetch_message(str(channel_id), str(message_id))
+            await edit_proxy_message(msg, bot, message.content)
+            await message.author.send(f"Message edited: {await mention_message(bot, message)}")
+            return
 
         content = message.content.lower()
         for prefix in Config.instance.prefixes:
@@ -95,6 +106,21 @@ def setup(bot: fluxer.Bot):
                     await Database.instance.delete_link_message(event.message_id, event.channel_id)
                     message_reactions.pop((event.message_id, event.user_id))
                     await bot.delete_message(event.channel_id, event.message_id)
+        if event.emoji.name == "📝":
+            usr = await bot.fetch_user(str(event.user_id))
+            proxy_id = await Database.instance.get_proxy_id(event.message_id, event.channel_id)
+            if proxy_id:
+                proxy = await Database.instance.get_proxy(proxy_id)
+                if proxy.owner == usr.id:
+                    msg = await bot.fetch_message(str(event.channel_id), str(event.message_id))
+                    await remove_reaction(msg, event.emoji.name, usr)
+                    await usr.send(f"Editing message:\n```\n{recover_original_message(msg)}\n```")
+                    await usr.send("Please enter the new content of the message here:")
+                    editing_messages[usr.id] = (msg.channel_id, msg.id)
+                    await asyncio.sleep(60)
+                    if usr.id in editing_messages:
+                        await usr.send("Message edit request expired!")
+                        editing_messages.pop(usr.id)
         if event.emoji.name == "🔔":
             proxy_id = await Database.instance.get_proxy_id(event.message_id, event.channel_id)
             if proxy_id:

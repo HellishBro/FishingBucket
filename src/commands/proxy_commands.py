@@ -10,8 +10,8 @@ from ..commands import register_command, register_group
 from ..interaction import Interactions
 from ..interactions_impl import show_proxy_info
 from ..backend.models import optional_type, Proxy, alternative
-from ..send_proxy import reproxy as proxy_reproxy
-from ..backend.utils import get_guild_id_from_channel, normalize_emojis
+from ..send_proxy import reproxy as proxy_reproxy, edit_proxy_message
+from ..backend.utils import get_guild_id_from_channel, normalize_emojis, edit_webhook
 
 
 def setup(bot: fluxer.Bot):
@@ -214,7 +214,6 @@ def setup(bot: fluxer.Bot):
             await message.delete()
 
 
-    '''
     @register_command([str], bot, "edit", """
     Edits a proxy message.
     This require the command to be a reply to a message sent by a proxy **that you own**.
@@ -227,17 +226,13 @@ def setup(bot: fluxer.Bot):
             if proxy.owner == message.author.id:
                 webhook_id = await Database.instance.get_channel_webhook(parent.channel_id)
                 if webhook_id:
-                    webhook = await bot.fetch_webhook(str(webhook_id))
-                    await edit_webhook(webhook, bot, message, new)
+                    await edit_proxy_message(parent, bot, new)
                     await message.delete()
                     return
             m = await response.respond(message, "You do not own this proxy! This message will expire in 15 seconds.")
-            if await interactions.wait_claim_after(15, m.id):
+            if await Interactions.instance.wait_claim_after(15, m.id, m.author.id):
                 await response.delete_message(m)
-                await message.delete()
             return
         m = await response.respond(message, "That message is not a proxied message! This message will expire in 15 seconds.")
-        if await interactions.wait_claim_after(15, m.id):
+        if await Interactions.instance.wait_claim_after(15, m.id, m.author.id):
             await response.delete_message(m)
-            await message.delete()
-    '''

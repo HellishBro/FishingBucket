@@ -5,11 +5,12 @@ import expr_dice_roller as dice
 import fluxer
 import re
 
+from .backend.cache import TTLCache
 from .backend.database import Database, GuildPreference
 from .backend.models import Proxy
 from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
-from .backend.utils import mention_message, convert_attachments, normalize_emojis, roll_dice
+from .backend.utils import mention_message, convert_attachments, normalize_emojis, roll_dice, edit_webhook
 from .response import delete_message
 
 
@@ -55,6 +56,7 @@ async def get_proxied_messages(message: str, user_id: int, autoproxy: bool, auto
                 return []
     return res
 
+@TTLCache(2048, 3600).cache_async(["channel_id"])
 async def get_webhook(channel_id: int, bot: fluxer.Bot) -> fluxer.Webhook:
     if webhook_id := await Database.instance.get_channel_webhook(channel_id):
         webhook = await bot.fetch_webhook(str(webhook_id))
@@ -149,6 +151,39 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
             f"**Previous Proxy**: {old_proxy.effective_name}\n**New Proxy**: {new_proxy.effective_name}\n**Owner**: <@{new_proxy.owner}> (`{new_proxy.owner}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**New Message Link**: [jump]({message_link})"
         )
         embed.set_thumbnail(url=new_proxy.avatar_url)
+        await logging_channel.send("", embeds=[embed])
+
+
+def recover_original_message(message: fluxer.Message) -> str:
+    replying = any(embed["title"] == "Reply" for embed in message.embeds)
+    if replying:
+        pre, old_msg = message.content.split("\n", maxsplit=2)
+        return old_msg
+    return message.content
+
+
+async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_message_contents: str):
+    embeds = old_message.embeds
+    webhook = await get_webhook(old_message.channel_id, bot)
+    proxy = await Database.instance.get_proxy(await Database.instance.get_proxy_id(old_message.id, old_message.channel_id))
+    server_preferences = await Database.instance.get_guild_preferences((await bot.fetch_channel(str(old_message.channel_id))).guild_id)
+    embeds = [embed for embed in embeds if embed["title"] == "Reply"]
+    replying = len(embeds) >= 1
+    contents, embeds = await modify_message(proxy.owner, server_preferences, new_message_contents, embeds)
+    old_msg = old_message.content
+    if replying:
+        pre, old_msg = old_message.content.split("\n", maxsplit=2)
+        contents = pre + "\n" + contents
+    m = await edit_webhook(webhook, bot, old_message, contents, embeds)
+    logging_channel_id = server_preferences.logging_channel
+    if logging_channel_id != 0:
+        logging_channel = await bot.fetch_channel(str(logging_channel_id))
+        message_link = await mention_message(bot, m)
+        embed = fluxer.Embed(
+            f"Message Edit",
+            f"**Proxy**: {proxy.effective_name}\n**Owner**: <@{proxy.owner}> (`{proxy.owner}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**Message Link**: [jump]({message_link})\n**Old Message**:\n{'\n'.join('> ' + line for line in old_msg.split('\n'))}\n**New Message**:\n{'\n'.join('> ' + line for line in new_message_contents.split('\n'))}"
+        )
+        embed.set_thumbnail(url=proxy.avatar_url)
         await logging_channel.send("", embeds=[embed])
 
 
