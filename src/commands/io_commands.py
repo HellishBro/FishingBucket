@@ -191,9 +191,6 @@ def setup(bot: fluxer.Bot):
 
         inserted_proxy_instances = []
 
-        print(user_proxies)
-        print(proxies)
-
         for group in groups:
             founds = [g for g in user_groups if g.name == group.name]
             if founds:
