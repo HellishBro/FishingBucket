@@ -127,28 +127,44 @@ def setup(bot: fluxer.Bot):
         await message.delete()
         await proxy_reproxy(parent, bot, old_proxy, new_proxy)
 
-    @register_command([alternative(bool, str)], bot, "autoproxy", """
+    @register_command([alternative(bool, str), alternative("global", "community"), optional_type(alternative(float, "never"))], bot, "autoproxy", """
     Automatically proxies your messages.
     Autoproxy set to `true` or `latch` will proxy your messages as your last used proxy.
     If it is an ID, all messages will be sent as that proxy.
     You can still use proxies normally. Any explicit proxy message will override the autoproxy for that message only.
-    """, 'autoproxy <"latch" OR enabled OR proxy>', ["autoproxy latch", "autoproxy off", "autoproxy 69ed73"], "proxy")
-    async def autoproxy(message: fluxer.Message, setting: str | bool):
+    If `expires` is set, then the autoproxy will automatically expire after `expires` seconds.
+    The mode can be "all" if and only if autoproxy is being disabled.
+    """, 'autoproxy <"latch" OR enabled OR proxy> <"global" OR "community" OR "all"> [expires OR "never"]', ["autoproxy latch", "autoproxy off", "autoproxy 69ed73"], "proxy")
+    async def autoproxy(message: fluxer.Message, setting: str | bool, mode: str, expires: float | str | None):
         if setting in ("latch", "enable", "enabled"):
             setting = True
         elif setting in ("disable", "disabled"):
             setting = False
+        if expires == "never":
+            expires = None
+        if mode == "global" or mode == "all":
+            guild_id = 0
+            postfix = "globally"
+        else:
+            guild_id = await get_guild_id_from_channel(bot, message.channel_id)
+            postfix = "in this community"
+
         if setting is True:
-            await Database.instance.set_user_preferences(message.author.id, autoproxy=True, autoproxy_id=-1)
-            await response.respond(message, "Autoproxy has been set to latch mode!")
+            await Database.instance.set_autoproxy_preference(message.author.id, guild_id, None, expires)
+            await response.respond(message, f"Autoproxy has been set to latch mode {postfix}!")
         elif setting is False:
-            await Database.instance.set_user_preferences(message.author.id, autoproxy=False)
-            await response.respond(message, "Autoproxy has been turned off.")
+            if mode == "all":
+                await Database.instance.remove_all_autoproxy_preference(message.author.id)
+                await response.respond(message, "Autoproxy has been turned off for everything.")
+                return
+
+            await Database.instance.remove_autoproxy_preference(message.author.id, guild_id)
+            await response.respond(message, f"Autoproxy has been turned off {postfix}.")
         else:
             if not (proxy := await ensure_own_proxy(message, setting)):
                 return
-            await Database.instance.set_user_preferences(message.author.id, autoproxy=True, autoproxy_id=proxy.id)
-            await response.respond(message, f"Autoproxying as **{proxy.name}**.")
+            await Database.instance.set_autoproxy_preference(message.author.id, guild_id, proxy.id, expires)
+            await response.respond(message, f"Autoproxying as **{proxy.name}** {postfix}.")
 
 
     @register_command([str], bot, "info", """

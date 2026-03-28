@@ -2,6 +2,7 @@ from typing import Any
 import aiosqlite as sql
 import time
 from collections import namedtuple
+from dataclasses import dataclass
 
 from .cache import TTLCache
 from .models import Proxy, ProxyGroup
@@ -28,8 +29,27 @@ def upsert_query(table: str, key: str, key_check: Any, names: dict[str, tuple[An
     params = (key_check, ) + tuple(defaults) + tuple(values) + (key_check, )
     return sql_str, params
 
-UserPreference = namedtuple("UserPreference", "autoproxy autoproxy_id last_used_proxy private_description private_trigger private_metadata private_group private_list dice_functions")
-GuildPreference = namedtuple("GuildPreference", "disallow_by_default logging_channel dice_functions")
+class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list dice_functions")):
+    private_description: bool
+    private_trigger: bool
+    private_metadata: bool
+    private_group: bool
+    private_list: bool
+    dice_functions: bytes
+
+class GuildPreference(namedtuple("GuildPreference", "disallow_by_default logging_channel dice_functions")):
+    disallow_by_default: bool
+    logging_channel: int
+    dice_functions: bytes
+
+@dataclass # it's better if this is mutable for caching
+class UserAutoproxyPreference:
+    proxy: int | None
+    last_used_proxy: int | None
+    expires: float
+
+    def expires_now(self) -> bool:
+        return self.expires != 0 and self.expires < time.time()
 
 class Cache:
     LONG = 3600
@@ -46,6 +66,7 @@ class Cache:
 
     user_id = TTLCache[tuple[int], int](MID, LONG)
     user_preferences = TTLCache[tuple[int], UserPreference](MID, LONG)
+    autoproxy_preferences = TTLCache[tuple[int, int], UserAutoproxyPreference | None](MID, LONG)
     latest_proxy_message_from_user = TTLCache[tuple[int, int], int](BIG, SHORT)
     proxy_id_from_message = TTLCache[tuple[int, int], int](MID, MEDIUM)
     guild_preferences = TTLCache(SMALL, MEDIUM)
@@ -67,6 +88,7 @@ class Database:
     async def init(self):
         self.connection = await sql.connect(self.database_file)
         await self.create_tables()
+        await self.migrate()
         print("Database connection established.")
 
     async def create_tables(self):
@@ -82,7 +104,7 @@ class Database:
             creation_date REAL,
             proxy_group INTEGER,
             nickname TEXT
-        )
+        );
         """)
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS proxy_groups (
@@ -93,26 +115,26 @@ class Database:
             creation_date REAL,
             tag TEXT,
             parent INTEGER
-        )
+        );
         """)
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS channel_webhook_map (
             channel_id INTEGER PRIMARY KEY,
             webhook_id INTEGER
-        )
+        );
         """)
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS global_stats (
             key TEXT PRIMARY KEY,
             value REAL
-        )
+        );
         """)
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS channel_overrides (
             channel_id INTEGER PRIMARY KEY,
             guild_id INTEGER,
             allow_proxy INTEGER
-        )
+        );
         """)
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS guild_preferences (
@@ -120,46 +142,71 @@ class Database:
             disallow_by_default BOOLEAN,
             logging_channel INTEGER,
             dice_functions BLOB
-        )
+        );
         """)
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS message_links (
             message_id INTEGER,
             channel_id INTEGER,
             proxy_id INTEGER
-        )
+        );
         """)
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS user_settings (
             user_id INTEGER PRIMARY KEY,
-            autoproxy BOOLEAN,
-            autoproxy_id INTEGER,
-            last_used_proxy INTEGER,
             private_description BOOLEAN,
             private_trigger BOOLEAN,
             private_metadata BOOLEAN,
             private_group BOOLEAN,
             private_list BOOLEAN,
             dice_functions BLOB
-        )
+        );
         """)
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS alt_accounts (
             alt_id INTEGER PRIMARY KEY,
             owner INTEGER
-        )
+        );
         """)
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_proxies_owner ON proxies (owner)")
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_proxies_group ON proxies (proxy_group)")
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_message_links_channel ON message_links (channel_id)")
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_message_links_proxy ON message_links (proxy_id)")
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_channel_overrides_guild ON channel_overrides (guild_id)")
-        await self.connection.execute("PRAGMA journal_mode=WAL")
-        await self.connection.execute("PRAGMA synchronous=NORMAL")
-        await self.connection.execute("PRAGMA cache_size=-64000") # 64MB cache
-        await self.connection.execute("PRAGMA temp_store=MEMORY")
-        await self.connection.execute("PRAGMA mmap_size=268435456") # 256MB mmap io
+        await self.connection.execute("""
+        CREATE TABLE IF NOT EXISTS autoproxies (
+            guild_id INTEGER,
+            user_id INTEGER,
+            proxy INTEGER,
+            last_used_proxy INTEGER,
+            expires REAL,
+            PRIMARY KEY (guild_id, user_id)
+        );
+        """)
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_proxies_owner ON proxies (owner);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_proxies_group ON proxies (proxy_group);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_message_links_channel ON message_links (channel_id);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_message_links_proxy ON message_links (proxy_id);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_channel_overrides_guild ON channel_overrides (guild_id);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_guild_id ON autoproxies (guild_id);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_user_id ON autoproxies (user_id);")
+        await self.connection.execute("PRAGMA journal_mode=WAL;")
+        await self.connection.execute("PRAGMA synchronous=NORMAL;")
+        await self.connection.execute("PRAGMA cache_size=-64000;") # 64MB cache
+        await self.connection.execute("PRAGMA temp_store=MEMORY;")
+        await self.connection.execute("PRAGMA mmap_size=268435456;") # 256MB mmap io
         await self.connection.commit()
+
+    async def migrate(self):
+        version = (await self.get_global_stats()).get("version", 0)
+
+        if version == 0:
+            try:
+                await self.connection.execute("ALTER TABLE user_settings DROP COLUMN autoproxy")
+                await self.connection.execute("ALTER TABLE user_settings DROP COLUMN autoproxy_id")
+                await self.connection.execute("ALTER TABLE user_settings DROP COLUMN last_used_proxy")
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
+        await self.set_global_data("version", str(version), version)
 
     @Cache.user_id.cache_async()
     async def get_user_id(self, alt_or_user: int) -> int:
@@ -175,12 +222,63 @@ class Database:
         await self.connection.commit()
         Cache.user_id.invalidate((alt, ))
 
+    async def get_autoproxy_preference(self, user_id: int, guild_id: int) -> UserAutoproxyPreference | None:
+        if (ref := Cache.autoproxy_preferences.get((user_id, guild_id), 0)) is not 0:
+            if ref and ref.expires_now():
+                Cache.autoproxy_preferences.invalidate((user_id, guild_id))
+                return None
+            return ref
+
+        async with self.connection.execute(
+            "SELECT proxy, last_used_proxy, expires FROM autoproxies WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                if guild_id != 0:
+                    return await self.get_autoproxy_preference(user_id, 0)
+                Cache.autoproxy_preferences.set((user_id, guild_id), None)
+                return None
+            preferences = UserAutoproxyPreference(*row)
+            if preferences.expires_now():
+                await self.remove_autoproxy_preference(user_id, guild_id)
+                if guild_id != 0:
+                    return await self.get_autoproxy_preference(user_id, 0)
+                return None
+            Cache.autoproxy_preferences.set((user_id, guild_id), preferences)
+            return preferences
+
+    async def set_autoproxy_preference(self, user_id: int, guild_id: int, proxy: int | None, expires: int | None):
+        await self.connection.execute(
+            "INSERT OR REPLACE INTO autoproxies (guild_id, user_id, proxy, last_used_proxy, expires) VALUES (?, ?, ?, ?, ?)",
+            (guild_id, user_id, proxy, None, (time.time() + expires) if expires else 0)
+        )
+        await self.connection.commit()
+        Cache.autoproxy_preferences.invalidate((user_id, guild_id))
+
+    async def set_autoproxy_last_used_proxy(self, user_id: int, guild_id: int, last_used_proxy: int):
+        await self.connection.execute(
+            "UPDATE autoproxies SET last_used_proxy = ? WHERE guild_id = ? AND user_id = ?",
+            (last_used_proxy, guild_id, user_id)
+        )
+        await self.connection.commit()
+        if pref := await self.get_autoproxy_preference(user_id, guild_id):
+            pref.last_used_proxy = last_used_proxy
+
+    async def remove_autoproxy_preference(self, user_id: int, guild_id: int):
+        await self.connection.execute("DELETE FROM autoproxies WHERE guild_id = ? AND user_id = ?", (guild_id, user_id))
+        await self.connection.commit()
+        Cache.autoproxy_preferences.invalidate((user_id, guild_id))
+
+    async def remove_all_autoproxy_preference(self, user_id: int):
+        await self.connection.execute("DELETE FROM autoproxies WHERE user_id = ?", (user_id, ))
+        await self.connection.commit()
+        Cache.autoproxy_preferences.clear(lambda k, v: k[0] == user_id)
+
+
     async def set_user_preferences(
             self,
             user_id: int,
-            autoproxy: bool | None = None,
-            autoproxy_id: int | None = None,
-            last_used_proxy: int | None = None,
             private_description: bool | None = None,
             private_trigger: bool | None = None,
             private_metadata: bool | None = None,
@@ -189,9 +287,6 @@ class Database:
             dice_functions: bytes | None = None
     ):
         names = {
-            "autoproxy": (autoproxy, False),
-            "autoproxy_id": (autoproxy_id, -1),
-            "last_used_proxy": (last_used_proxy, -1),
             "private_description": (private_description, False),
             "private_trigger": (private_trigger, False),
             "private_metadata": (private_metadata, False),
@@ -207,7 +302,7 @@ class Database:
 
         user_id = await self.get_user_id(user_id)
         prefs = await self.get_user_preferences(user_id)
-        true_compare_list = (autoproxy, autoproxy_id, last_used_proxy, private_description, private_trigger, private_metadata, private_group, private_list, dice_functions)
+        true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, dice_functions)
         true_compare_list = tuple((a if a is not None else b for a, b in zip(true_compare_list, prefs)))
         if prefs != true_compare_list:
             await self.connection.execute(*upsert_query("user_settings", "user_id", user_id, names, changes, values))
@@ -221,7 +316,7 @@ class Database:
                 (await self.get_user_id(user_id), )
         ) as cursor:
             res = await cursor.fetchone()
-            if not res: return UserPreference(False, -1, -1, False, False, False, False, False, b"")
+            if not res: return UserPreference(False, False, False, False, False, b"")
             else: return UserPreference(*res[1:])
 
     @Cache.latest_proxy_message_from_user.cache_async()
@@ -234,7 +329,6 @@ class Database:
             if not res: return None
             message_id, = res
             return message_id
-
 
     async def link_message(self, message_id: int, channel_id: int, proxy_id: int):
         await self.connection.execute(

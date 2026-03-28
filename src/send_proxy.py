@@ -1,3 +1,4 @@
+import time
 import traceback
 from typing import Literal
 
@@ -7,11 +8,12 @@ import re
 
 from .backend.cache import TTLCache
 from .backend.config import Config
-from .backend.database import Database, GuildPreference
+from .backend.database import Database, GuildPreference, UserAutoproxyPreference
 from .backend.models import Proxy
 from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
-from .backend.utils import mention_message, convert_attachments, normalize_emojis, roll_dice, edit_webhook
+from .backend.utils import mention_message, convert_attachments, normalize_emojis, roll_dice, edit_webhook, \
+    get_guild_id_from_channel
 from .response import delete_message
 
 
@@ -32,12 +34,12 @@ async def get_proxy_from_message(message: str, user_proxies: list[Proxy]) -> tup
                 return proxy, res[1]
     return None
 
-async def get_proxied_messages(message: str, user_id: int, autoproxy: bool, autoproxy_id: int, last_used: int) -> list[tuple[Proxy, str]]:
+async def get_proxied_messages(message: str, user_id: int, autoproxy_preferences: UserAutoproxyPreference | None) -> list[tuple[Proxy, str]]:
     res: list[tuple[Proxy, str]] = []
     autoproxy_proxy = None
     user_proxies = await Database.instance.get_user_proxies(user_id)
-    if autoproxy:
-        prox_id = autoproxy_id if autoproxy_id != -1 else last_used
+    if autoproxy_preferences and not autoproxy_preferences.expires_now():
+        prox_id = autoproxy_preferences.proxy if autoproxy_preferences.proxy is not None else autoproxy_preferences.last_used_proxy
         autoproxy_proxy = await Database.instance.get_proxy(prox_id)
     for line in message.split("\n"):
         if proxy_m := await get_proxy_from_message(line, user_proxies):
@@ -147,7 +149,7 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
     contents, embeds = await modify_message(new_proxy.owner, server_preferences, contents, embeds)
     m = await webhook.send(contents, embeds=embeds, username=new_proxy.effective_name, avatar_url=new_proxy.avatar_url, files=await convert_attachments(attachments), wait=True)
     await Database.instance.transfer_proxy_usage(old_proxy.id, new_proxy.id)
-    await Database.instance.set_user_preferences(old_proxy.owner, last_used_proxy=new_proxy.id)
+    await Database.instance.set_autoproxy_last_used_proxy(old_proxy.owner, await get_guild_id_from_channel(bot, old_message.channel_id), new_proxy.id)
     await Database.instance.link_message(m.id, m.channel_id, new_proxy.id)
     logging_channel_id = server_preferences.logging_channel
     if logging_channel_id != 0:
@@ -199,10 +201,9 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
         return
 
     if await Database.instance.get_allow_proxy(int(message.channel_id), int(message.guild_id)):
-
-        settings = await Database.instance.get_user_preferences(message.author.id)
-        autoproxy, autoproxy_id, last_used, *_ = settings
-        proxied = await get_proxied_messages(message.content, int(message.author.id), autoproxy, autoproxy_id, last_used)
+        guild_id = await get_guild_id_from_channel(bot, message.channel_id)
+        autoproxy_prefs = await Database.instance.get_autoproxy_preference(message.author.id, guild_id)
+        proxied = await get_proxied_messages(message.content, int(message.author.id), autoproxy_prefs)
         if proxied:
             parent = None
             if message.referenced_message is not None:
@@ -256,6 +257,6 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
                 await Database.instance.use_proxy(proxy.id)
 
             if proxy:
-                await Database.instance.set_user_preferences(message.author.id, last_used_proxy=proxy.id)
+                await Database.instance.set_autoproxy_last_used_proxy(message.author.id, guild_id, proxy.id)
 
             await delete_message(message)
