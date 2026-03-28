@@ -44,14 +44,14 @@ class ProxyGroup:
         }
 
     @classmethod
-    def from_pk(cls, group: dict, owner: int, tag: str | None) -> ProxyGroup:
+    def from_pk(cls, group: dict, owner: int) -> ProxyGroup:
         return ProxyGroup(
             None,
             group["name"],
             group["description"] or "",
             owner,
             datetime.fromisoformat(group["created"]).timestamp() if group["created"] else time.time(),
-            ("{} " + tag) if tag else "",
+            "",
             None
         )
 
@@ -130,7 +130,7 @@ class Proxy:
     def effective_name(self) -> str:
         n = self.nickname or self.name
         this_group = self.group
-        while this_group and this_group.tag:
+        while this_group:
             g = {
                 "id": this_group.id,
                 "name": this_group.name,
@@ -139,7 +139,7 @@ class Proxy:
                 "creation_date": this_group.creation_date,
                 "tag": this_group.tag
             }
-            n = Template.from_string(this_group.tag).compute({
+            n = Template.from_string(this_group.tag or "{}").compute({
                 "name": n,
                 "proxy": {
                     "id": self.id,

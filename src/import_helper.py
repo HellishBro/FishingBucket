@@ -108,7 +108,7 @@ def import_pluralkit(json: dict, owner: int) -> tuple[list[ProxyGroup], list[Pro
         parsed_groups.append(default_group)
 
     for group in groups:
-        g = ProxyGroup.from_pk(group, owner, tag)
+        g = ProxyGroup.from_pk(group, owner)
         for member in group.get("members", []):
             if member in member_mapping:
                 member_mapping[member].group = g
