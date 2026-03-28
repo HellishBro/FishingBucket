@@ -122,13 +122,14 @@ def setup(bot: fluxer.Bot):
             all_stats.update(CacheStatus.instance.miss_cause)
         all_stats["uptime"] = datetime.now() - start_time
         mapping = {
-            "proxy_uses": ("Total proxy uses", lambda n: str(int(n))),
-            "guilds": ("Total community count", lambda n: str(int(n))),
-            "total_proxies": ("Total registered proxies", lambda n: str(int(n))),
-            "uptime": ("Uptime", lambda td: str(td)),
-            "cache_hits": ("Cache hits", lambda n: str(int(n))),
-            "cache_misses": ("Cache misses", lambda n: str(int(n))),
-            "commands": ("Session command invocations", lambda n: str(int(n)))
+            "proxy_uses": ("Total proxy uses", lambda n: int(n)),
+            "guilds": ("Total community count", lambda n: int(n)),
+            "total_proxies": ("Total registered proxies", lambda n: int(n)),
+            "uptime": ("Uptime", lambda td: td),
+            "cache_hits": ("Cache hits", lambda n: int(n)),
+            "cache_misses": ("Cache misses", lambda n: int(n)),
+            "commands": ("Session command invocations", lambda n: int(n)),
+            "version": ("Database version", lambda n: int(n))
         }
         if stat:
             if stat in all_stats:
@@ -152,5 +153,5 @@ def setup(bot: fluxer.Bot):
     async def donate(message: fluxer.Message):
         await response.respond(message, "", [fluxer.Embed(
             "Support the Bot!",
-            f"I have a Buy-Me-A-Coffee now! You can donate to me to support {Config.instance.name}'s development! [{Config.instance.donation}]({Config.instance.donation})."
+            f"I have a donation link now! You can donate to me to support {Config.instance.name}'s development! [{Config.instance.donation}]({Config.instance.donation})."
         )])
