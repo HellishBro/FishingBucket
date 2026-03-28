@@ -1,11 +1,9 @@
-import threading
 import random
 import asyncio
 
 import fluxer
 from fluxer import gateway
 
-from .down_runner import report_bot
 from ..backend.config import Config
 from ..backend.data_reader import DataReader
 from ..backend.template_utils import Template

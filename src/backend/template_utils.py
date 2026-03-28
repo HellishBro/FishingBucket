@@ -50,9 +50,9 @@ class Template:
             if char == "\\" and escaped == 0:
                 escaped = 2
 
-            if not string_mode and char in '"\'':
+            if braces != 0 and not string_mode and char in '"\'':
                 string_mode = char
-            elif string_mode == char and prev != "\\":
+            elif braces != 0 and string_mode == char and prev != "\\":
                 string_mode = False
 
             if not string_mode:
