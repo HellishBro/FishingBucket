@@ -21,36 +21,6 @@ def run(config_file: str):
 
     bot = fluxer.Bot(command_prefix=Config.instance.prefixes[0], intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
     Interactions()
-    builtin_print = print
-
-    @bot.command(name="eval")
-    async def eval_(message: fluxer.Message):
-        code, = await commands.parse_command(message, [str], bot, "eval")
-        if int(message.author.id) in Config.instance.devs:
-            try:
-                comp = compile(code, "<string>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
-
-                _output = []
-                def print(*args):
-                    builtin_print(*args)
-                    _output.append(" ".join(str(arg) for arg in args))
-
-                res = eval(comp, globals(), locals())
-                if asyncio.iscoroutine(res):
-                    await res
-
-                returned = "\n".join(_output)
-            except Exception as e:
-                returned = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-
-            m = await message.reply("", embeds=[fluxer.Embed(
-                "Code eval",
-                f"**Input**\n```py\n{code}\n```\n\n**Output**\n```\n{returned[:min(len(returned), 1000)]}\n```"
-            ).to_dict()])
-
-            await asyncio.sleep(30)
-            await message.delete()
-            await m.delete()
 
     if Config.instance.use_extras:
         from .extras.down_runner import report_bot
