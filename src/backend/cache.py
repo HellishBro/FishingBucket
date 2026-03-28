@@ -34,10 +34,10 @@ class TTLCache[T, U]:
 
     def get(self, key: T, default: U = None) -> U | None:
         self.expire()
-        item = self._cache.get(self.make_hashable(key), default)
-        if item:
-            return item[0]
-        return None
+        k = self.make_hashable(key)
+        if k in self._cache:
+            return self._cache[k][0]
+        return default
 
     def set(self, key: T, value: U):
         if len(self._cache) >= self.max_size and self.make_hashable(key) not in self._cache:
