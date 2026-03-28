@@ -48,7 +48,8 @@ def import_native(json: dict, owner: int) -> tuple[list[ProxyGroup], list[Proxy]
             proxy["times_used"],
             proxy["time"],
             parsed_groups.get(proxy["group"], None),
-            proxy["nickname"]
+            proxy["nickname"],
+            proxy["forms"]
         ))
 
     return [*parsed_groups.values()], parsed_proxies
@@ -82,7 +83,8 @@ def export_native(groups: list[ProxyGroup], proxies: list[Proxy]) -> dict:
             "times_used": proxy.times_used,
             "time": proxy.creation_date,
             "group": group_obj_idx_map.get(id(proxy.group), None),
-            "nickname": proxy.nickname
+            "nickname": proxy.nickname,
+            "forms": proxy.forms
         })
 
     return {"groups": serialized_groups, "proxies": serialized_proxies}

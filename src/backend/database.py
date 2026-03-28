@@ -1,3 +1,4 @@
+import json
 from typing import Any
 import aiosqlite as sql
 import time
@@ -7,7 +8,7 @@ from dataclasses import dataclass
 from .cache import TTLCache
 from .models import Proxy, ProxyGroup
 
-lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner", "times_used", "creation_date", "proxy_group", "nickname"]
+lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner", "times_used", "creation_date", "proxy_group", "nickname", "proxy_forms", "current_form"]
 proxy_fields = ", ".join(lst_proxy_fields)
 group_fields = ", ".join(["id", "name", "description", "owner", "creation_date", "tag", "parent"])
 
@@ -29,12 +30,13 @@ def upsert_query(table: str, key: str, key_check: Any, names: dict[str, tuple[An
     params = (key_check, ) + tuple(defaults) + tuple(values) + (key_check, )
     return sql_str, params
 
-class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list dice_functions")):
+class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list private_forms dice_functions")):
     private_description: bool
     private_trigger: bool
     private_metadata: bool
     private_group: bool
     private_list: bool
+    private_forms: bool
     dice_functions: bytes
 
 class GuildPreference(namedtuple("GuildPreference", "disallow_by_default logging_channel dice_functions")):
@@ -89,6 +91,8 @@ class Database:
         self.connection = await sql.connect(self.database_file)
         await self.create_tables()
         await self.migrate()
+        await self.connection.execute("VACUUM")
+        await self.connection.commit()
         print("Database connection established.")
 
     async def create_tables(self):
@@ -103,7 +107,9 @@ class Database:
             times_used INTEGER,
             creation_date REAL,
             proxy_group INTEGER,
-            nickname TEXT
+            nickname TEXT,
+            proxy_forms TEXT,
+            current_form TEXT
         );
         """)
         await self.connection.execute("""
@@ -159,6 +165,7 @@ class Database:
             private_metadata BOOLEAN,
             private_group BOOLEAN,
             private_list BOOLEAN,
+            private_forms BOOLEAN,
             dice_functions BLOB
         );
         """)
@@ -204,6 +211,64 @@ class Database:
                 pass
             finally:
                 await self.connection.commit()
+            version += 1
+
+        if version == 1:
+            try:
+                await self.connection.execute("ALTER TABLE proxies ADD COLUMN proxy_forms TEXT")
+                await self.connection.execute("ALTER TABLE proxies ADD COLUMN current_form TEXT")
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
+        if version == 2:
+            try:
+                await self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS user_settings_new (
+                    user_id INTEGER PRIMARY KEY,
+                    private_description BOOLEAN,
+                    private_trigger BOOLEAN,
+                    private_metadata BOOLEAN,
+                    private_group BOOLEAN,
+                    private_list BOOLEAN,
+                    private_forms BOOLEAN,
+                    dice_functions BLOB
+                );
+                """)
+                await self.connection.execute("""
+                INSERT INTO user_settings_new (
+                    user_id,
+                    private_description,
+                    private_trigger,
+                    private_metadata,
+                    private_group,
+                    private_list,
+                    private_forms,
+                    dice_functions
+                ) SELECT 
+                    user_id,
+                    private_description,
+                    private_trigger,
+                    private_metadata,
+                    private_group,
+                    private_list,
+                    FALSE,
+                    dice_functions
+                FROM user_settings;
+                """)
+                await self.connection.execute("""
+                DROP TABLE user_settings;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE user_settings_new RENAME TO user_settings;
+                """)
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+
             version += 1
 
         await self.set_global_data("version", str(version), version)
@@ -275,7 +340,6 @@ class Database:
         await self.connection.commit()
         Cache.autoproxy_preferences.clear(lambda k, v: k[0] == user_id)
 
-
     async def set_user_preferences(
             self,
             user_id: int,
@@ -284,6 +348,7 @@ class Database:
             private_metadata: bool | None = None,
             private_group: bool | None = None,
             private_list: bool | None = None,
+            private_forms: bool | None = None,
             dice_functions: bytes | None = None
     ):
         names = {
@@ -292,6 +357,7 @@ class Database:
             "private_metadata": (private_metadata, False),
             "private_group": (private_group, False),
             "private_list": (private_list, False),
+            "private_forms": (private_forms, False),
             "dice_functions": (dice_functions, b"")
         }
         changes = [k for k, (v, _) in names.items() if v is not None]
@@ -302,7 +368,7 @@ class Database:
 
         user_id = await self.get_user_id(user_id)
         prefs = await self.get_user_preferences(user_id)
-        true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, dice_functions)
+        true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, private_forms, dice_functions)
         true_compare_list = tuple((a if a is not None else b for a, b in zip(true_compare_list, prefs)))
         if prefs != true_compare_list:
             await self.connection.execute(*upsert_query("user_settings", "user_id", user_id, names, changes, values))
@@ -316,7 +382,7 @@ class Database:
                 (await self.get_user_id(user_id), )
         ) as cursor:
             res = await cursor.fetchone()
-            if not res: return UserPreference(False, False, False, False, False, b"")
+            if not res: return UserPreference(False, False, False, False, False, False, b"")
             else: return UserPreference(*res[1:])
 
     @Cache.latest_proxy_message_from_user.cache_async()
@@ -462,8 +528,8 @@ class Database:
 
     async def put_proxy(self, proxy: Proxy) -> Proxy:
         cursor = await self.connection.execute(
-            "INSERT INTO proxies (name, description, avatar_url, trigger, owner, times_used, creation_date, proxy_group, nickname) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (proxy.name, proxy.description, proxy.avatar_url, "\n".join(proxy.triggers), proxy.owner, proxy.times_used, time.time(), proxy.group.id if proxy.group else None, proxy.nickname)
+            "INSERT INTO proxies (name, description, avatar_url, trigger, owner, times_used, creation_date, proxy_group, nickname, proxy_forms, current_form) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (proxy.name, proxy.description, proxy.avatar_url, "\n".join(proxy.triggers), proxy.owner, proxy.times_used, time.time(), proxy.group.id if proxy.group else None, proxy.nickname, json.dumps(proxy.forms), proxy.current_form)
         )
         await self.connection.commit()
         proxy.id = cursor.lastrowid
@@ -545,6 +611,24 @@ class Database:
         )
         if prox := await self.get_proxy(id_):
             prox.triggers = triggers
+        await self.connection.commit()
+
+    async def update_forms(self, id_: int, forms: dict[str, str]):
+        await self.connection.execute(
+            "UPDATE proxies SET proxy_forms = ? WHERE id = ?",
+            (json.dumps(forms), id_)
+        )
+        if prox := await self.get_proxy(id_):
+            prox.forms = forms
+        await self.connection.commit()
+
+    async def update_current_form(self, id_: int, form: str | None):
+        await self.connection.execute(
+            "UPDATE proxies SET current_form = ? WHERE id = ?",
+            (form, id_)
+        )
+        if prox := await self.get_proxy(id_):
+            prox.current_form = form
         await self.connection.commit()
 
     async def update_name(self, id_: int, name: str):

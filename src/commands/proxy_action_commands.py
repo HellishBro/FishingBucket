@@ -62,7 +62,6 @@ def setup(bot: fluxer.Bot):
     @register_command([str, alternative("set", "add", "remove"), optional_type(str)], bot, "set triggers", """
     Updates a proxy's triggers.
     The `new trigger` argument will be used to trigger your proxy after changing it.
-    Like the register command, there must be at least one trigger.
     If the mode is set to `set`, then the `trigger` parameter is optional, and it will replace all previous triggers. If there's no triggers, then the proxy cannot be used through regular means.
     If the mode is set to `add`, then the `trigger` parameter is required, and it will be appended to the trigger list.
     If the mode is set to `remove`, then it will try to remove `trigger` from the trigger list, and if none is supplied, it will remove all triggers.
@@ -160,6 +159,89 @@ def setup(bot: fluxer.Bot):
                 f"The description for {proxy.name} has been cleared!"
             )
         await response.respond(message, "", [embed])
+
+    @register_command([str, alternative("set", "add", "remove"), optional_type(str), optional_type(str)], bot, "set forms", """
+    Updates a proxy's different forms.
+    This command does not update the current form.
+    If the mode is set to `set`, then the form parameters are optional, and it will replace all forms.
+    If the mode is set to `add`, then the form parameters are required, and it will be appended to the forms of the proxy.
+    If the mode is set to `remove`, then it will try to remove `form name` from the forms list, and if none is supplied, it will remove all forms.
+    Form avatar can either be a URL or submitted as an attachment.
+    """, 'set forms <proxy> <"set" OR "add" OR "remove"> [form name] [form avatar]',
+                      ['set forms 69ed73 add "Midnight Form" https://example.com/avatar.png', 'set forms 69e73 set'], "proxy_act")
+    async def change_forms(message: fluxer.Message, id_: str, mode: str, form_name: str | None, form_avatar: str | None):
+        if mode == "add" and form_name is None:
+            await response.respond(message, 'Error! "add" mode must have forms to add!')
+            return
+
+        proxy = await ensure_own_proxy(message, id_)
+        if not proxy: return
+
+        avatar_url: str | None = None
+        if form_name:
+            if not message.attachments:
+                avatar_url = form_avatar or Proxy.random_avatar()
+            else:
+                avatar_url = message.attachments[0].url
+
+        forms = proxy.forms
+        curr_form = proxy.current_form
+        if mode == "set":
+            if form_name:
+                forms = {form_name: avatar_url}
+            else:
+                forms = {}
+                curr_form = None
+        elif mode == "remove":
+            if form_name in forms:
+                forms.pop(form_name)
+                if curr_form == form_name:
+                    curr_form = None
+        elif mode == "add":
+            forms[form_name] = avatar_url
+
+        await Database.instance.update_forms(proxy.id, forms)
+        await Database.instance.update_current_form(proxy.id, curr_form)
+
+        forms_text = []
+        for fname, furl in forms.items():
+            text = f"- {fname}: [avatar]({furl})"
+            if curr_form == fname:
+                text += " (current)"
+            forms_text.append(text)
+        forms_text = "\n".join(forms_text) if forms_text else "No forms!"
+
+        embed = fluxer.Embed(
+            "Proxy Updated!",
+            f"The forms for **{proxy.name}** has been changed! Proxy forms:\n{forms_text}"
+        )
+        await response.respond(message, "", [embed])
+
+    @register_command([str, optional_type(str)], bot, "set form", """
+    Sets the current form of the proxy.
+    If the form is not provided, the form will be cleared.
+    """, "set form <proxy> [form]", ['set form 69ed73 "Midnight Form"', "set form 69ed73"], "proxy_act")
+    async def set_form(message: fluxer.Message, id_: str, form: str | None):
+        proxy = await ensure_own_proxy(message, id_)
+        if not proxy: return
+
+        if form is None:
+            await Database.instance.update_current_form(proxy.id, None)
+            await response.respond(message, "", [fluxer.Embed(
+                "Proxy Updated!",
+                f"The current form for **{proxy.effective_name}** has been reset."
+            )])
+            return
+
+        if form in proxy.forms:
+            await Database.instance.update_current_form(proxy.id, form)
+            await response.respond(message, "", [fluxer.Embed(
+                "Proxy Updated!",
+                f"The current form for **{proxy.effective_name}** has been changed to `{form}`."
+            )])
+        else:
+            await response.respond(message, f"Error! **{proxy.effective_name}** does not have the form `{form}`!")
+
 
     @register_command([], bot, "nuke", """
     Deletes every proxy associated with your account.

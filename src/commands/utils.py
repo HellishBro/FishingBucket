@@ -86,6 +86,12 @@ def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detail
         if not user_preference.private_trigger or detailed:
             lines.append(f"- Triggers: {', '.join(f'`{trigger}`' for trigger in proxy.triggers) if proxy.triggers else '*N/A*'}")
         lines.append(f"- Avatar: [source]({proxy.avatar_url})")
+        if not user_preference.private_forms or detailed:
+            if proxy.forms:
+                lines.append(f"- Forms:")
+                for fname, furl in proxy.forms.items():
+                    lines.append(f"    - {fname}: [avatar]({furl}){' (current)' if proxy.current_form == fname else ''}")
+
         if not user_preference.private_metadata or detailed:
             lines.append(f"- Messages Send: {proxy.times_used}")
             lines.append(f"- Creation Date: {format_date(datetime.fromtimestamp(proxy.creation_date))}")

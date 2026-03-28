@@ -2,6 +2,7 @@ import random
 import time
 from dataclasses import dataclass
 from datetime import datetime
+import json
 
 from .template_utils import Template
 
@@ -68,18 +69,20 @@ class Proxy:
     creation_date: float
     group: ProxyGroup | None
     nickname: str | None
+    forms: dict[str, str]
+    current_form: str | None
 
     @staticmethod
     def random_avatar() -> str:
         return f"https://raw.githubusercontent.com/fluxerapp/static/refs/heads/main/avatars/{random.randint(0, 5)}.png"
 
     @classmethod
-    def from_database(cls, data: tuple[int, str, str, str, str, int, int, float, int | None, str | None], groups: list[ProxyGroup]) -> Proxy:
+    def from_database(cls, data: tuple[int, str, str, str, str, int, int, float, int | None, str | None, str | None, str | None], groups: list[ProxyGroup]) -> Proxy:
         group = None
         if data[8] and groups:
             group = [g for g in groups if g.id == data[8]][0]
 
-        return cls(data[0], data[1], data[2], data[3], data[4].split("\n"), data[5], data[6], data[7], group, data[9])
+        return cls(data[0], data[1], data[2], data[3], data[4].split("\n"), data[5], data[6], data[7], group, data[9], json.loads(data[10] or "{}"), data[11])
 
     @staticmethod
     def process_trigger_part(part: str) -> str:
@@ -108,7 +111,9 @@ class Proxy:
             tupper["posts"] or 0,
             datetime.fromisoformat(tupper["created_at"]).timestamp() if tupper["created_at"] else time.time(),
             groups.get(tupper["group_id"]),
-            nick
+            nick,
+            {},
+            None
         )
 
     @classmethod
@@ -123,7 +128,9 @@ class Proxy:
             pluralkit["message_count"],
             datetime.fromisoformat(pluralkit["created"]).timestamp() if pluralkit["created"] else time.time(),
             None,
-            pluralkit["display_name"]
+            pluralkit["display_name"],
+            {},
+            None
         )
 
     @property
@@ -156,6 +163,10 @@ class Proxy:
             }, n)
             this_group = this_group.parent
         return n
+
+    @property
+    def effective_avatar(self) -> str:
+        return self.forms.get(self.current_form, self.avatar_url)
 
 
 class optional_type:

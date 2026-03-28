@@ -65,6 +65,7 @@ def setup(bot: fluxer.Bot):
         - Proxy triggers (`triggers`)
         - Proxy and group metadata (`metadata`)
         - Proxy groups (`groups`)
+        - Proxy forms (`forms`)
         - Or, simply viewing your proxies and groups at all (`list`)
         
         Using proxy or group list commands in bot DMs will show private fields.
@@ -77,7 +78,8 @@ def setup(bot: fluxer.Bot):
             "private_trigger": False,
             "private_metadata": False,
             "private_group": False,
-            "private_list": False
+            "private_list": False,
+            "private_forms": False
         }
         for k, v in preferences._asdict().items():
             if k in pref_dict:
@@ -88,7 +90,8 @@ def setup(bot: fluxer.Bot):
             "private_trigger": "triggers",
             "private_metadata": "metadata",
             "private_group": "groups",
-            "private_list": "list"
+            "private_list": "list",
+            "private_forms": "forms"
         }
 
         public_options = [m[p] for p, v in pref_dict.items() if not v]
@@ -99,7 +102,7 @@ def setup(bot: fluxer.Bot):
         )])
 
     @register_command(
-        [alternative("public", "private"), alternative("all", one_or_more(alternative("description", "triggers", "metadata", "groups", "list")))],
+        [alternative("public", "private"), alternative("all", one_or_more(alternative("description", "triggers", "metadata", "groups", "list", "forms")))],
         bot, "privacy set", """
         Sets your privacy settings.
         `mode` will set the provided options public/private.
@@ -108,6 +111,7 @@ def setup(bot: fluxer.Bot):
         - Proxy triggers (`triggers`)
         - Proxy and group metadata (`metadata`)
         - Proxy groups (`groups`)
+        - Proxy forms (`forms`)
         - Or, simply viewing your proxies and groups at all (`list`)
         
         Using proxy or group list commands in bot DMs will show private fields.
@@ -118,14 +122,15 @@ def setup(bot: fluxer.Bot):
     )
     async def privacy_set(message: fluxer.Message, mode: str, options: list[str] | str):
         if options == "all":
-            options = ["description", "triggers", "metadata", "groups", "list"]
+            options = ["description", "triggers", "metadata", "groups", "list", "forms"]
 
         m = {
             "description": "private_description",
             "triggers": "private_trigger",
             "metadata": "private_metadata",
             "groups": "private_group",
-            "list": "private_list"
+            "list": "private_list",
+            "forms": "private_forms"
         }
 
         public = mode == "private"

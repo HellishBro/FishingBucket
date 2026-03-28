@@ -183,7 +183,7 @@ def setup(bot: fluxer.Bot):
             f"{proxy.name}",
             get_proxies_text([proxy], await Database.instance.get_user_preferences(message.author.id), detailed)
         )
-        embed.set_image(url=proxy.avatar_url)
+        embed.set_image(url=proxy.effective_avatar)
         await response.respond(message, "", [embed])
 
 

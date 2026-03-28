@@ -98,7 +98,7 @@ async def send_proxy_message(proxy: Proxy, message: str, parent_message: fluxer.
         message = f"-# ↩ {mention}\n" + message
 
     message, embeds = await modify_message(proxy.owner, await Database.instance.get_guild_preferences(channel.guild_id), message, embeds)
-    return await webhook.send(message, embeds=embeds, username=proxy.effective_name, avatar_url=proxy.avatar_url, files=await convert_attachments(attachments), wait=True)
+    return await webhook.send(message, embeds=embeds, username=proxy.effective_name, avatar_url=proxy.effective_avatar, files=await convert_attachments(attachments), wait=True)
 
 
 block_content_regex = re.compile(r"{{(.+?)}}")
@@ -147,7 +147,7 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
     await Database.instance.delete_link_message(old_message.id, old_message.channel_id)
     embeds = [embed for embed in embeds if embed["title"] == "Reply"]
     contents, embeds = await modify_message(new_proxy.owner, server_preferences, contents, embeds)
-    m = await webhook.send(contents, embeds=embeds, username=new_proxy.effective_name, avatar_url=new_proxy.avatar_url, files=await convert_attachments(attachments), wait=True)
+    m = await webhook.send(contents, embeds=embeds, username=new_proxy.effective_name, avatar_url=new_proxy.effective_avatar, files=await convert_attachments(attachments), wait=True)
     await Database.instance.transfer_proxy_usage(old_proxy.id, new_proxy.id)
     await Database.instance.set_autoproxy_last_used_proxy(old_proxy.owner, await get_guild_id_from_channel(bot, old_message.channel_id), new_proxy.id)
     await Database.instance.link_message(m.id, m.channel_id, new_proxy.id)
@@ -159,7 +159,7 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
             f"Message Proxy Change",
             f"**Previous Proxy**: {old_proxy.effective_name}\n**New Proxy**: {new_proxy.effective_name}\n**Owner**: <@{new_proxy.owner}> (`{new_proxy.owner}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**New Message Link**: [jump]({message_link})"
         )
-        embed.set_thumbnail(url=new_proxy.avatar_url)
+        embed.set_thumbnail(url=new_proxy.effective_avatar)
         await logging_channel.send("", embeds=[embed])
 
 
@@ -192,7 +192,7 @@ async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_m
             f"Message Edit",
             f"**Proxy**: {proxy.effective_name}\n**Owner**: <@{proxy.owner}> (`{proxy.owner}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**Message Link**: [jump]({message_link})\n**Old Message**:\n{'\n'.join('> ' + line for line in old_msg.split('\n'))}\n**New Message**:\n{'\n'.join('> ' + line for line in new_message_contents.split('\n'))}"
         )
-        embed.set_thumbnail(url=proxy.avatar_url)
+        embed.set_thumbnail(url=proxy.effective_avatar)
         await logging_channel.send("", embeds=[embed])
 
 
@@ -242,7 +242,7 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
                                 f"Proxied Message",
                                 f"**Proxy**: {proxy.effective_name}\n**Owner**: <@{proxy.owner}> (`{proxy.owner}`)\n**Channel**: <#{message.channel_id}> (`{message.channel_id}`)\n**Message Link**: [jump]({message_link})\n{reply_msg}**Message**:\n{'\n'.join('> ' + line for line in m.split('\n'))}"
                             )
-                            embed.set_thumbnail(url=proxy.avatar_url)
+                            embed.set_thumbnail(url=proxy.effective_avatar)
                             await logging_channel.send("", embeds=[embed])
 
                     if parent:
