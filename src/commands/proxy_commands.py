@@ -134,7 +134,7 @@ def setup(bot: fluxer.Bot):
     You can still use proxies normally. Any explicit proxy message will override the autoproxy for that message only.
     If `expires` is set, then the autoproxy will automatically expire after `expires` seconds.
     The mode can be "all" if and only if autoproxy is being disabled.
-    """, 'autoproxy <"latch" OR enabled OR proxy> <"global" OR "community" OR "all"> [expires OR "never"]', ["autoproxy latch", "autoproxy off", "autoproxy 69ed73"], "proxy")
+    """, 'autoproxy <"latch" OR enabled OR proxy> <"global" OR "community" OR "all"> [expires OR "never"]', ["autoproxy latch global", "autoproxy off community", "autoproxy 69ed73 global 3600"], "proxy")
     async def autoproxy(message: fluxer.Message, setting: str | bool, mode: str, expires: float | str | None):
         if setting in ("latch", "enable", "enabled"):
             setting = True
