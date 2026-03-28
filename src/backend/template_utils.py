@@ -187,12 +187,13 @@ class Template:
     def compute(self, variables: dict, default: str) -> str:
         if res := Cache.ComputeCache.get((self, variables, default)): return res
         string = ""
+        vars = self.map_variables(variables)
         for part in self.parts:
             if isinstance(part, TextPart):
                 string += part.content
             else:
                 if part.content:
-                    res = self.evaluate_expr(part.content, self.map_variables(variables))
+                    res = self.evaluate_expr(part.content, vars)
                     if res[0]:
                         string += res[1]
                     else:
