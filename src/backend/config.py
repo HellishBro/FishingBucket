@@ -24,6 +24,7 @@ class Config:
     database_file: str
     api_url: str
     data_path: str
+    webhook: str
 
     use_extras: bool
     donation: str
@@ -43,6 +44,7 @@ class Config:
         "database": "database_file",
         "api": "api_url",
         "data": "data_path",
+        "webhook": "webhook",
         "use_extras": "use_extras",
         "?donation": "donation",
         "?user_token": "user_token",

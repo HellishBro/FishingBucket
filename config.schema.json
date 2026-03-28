@@ -12,6 +12,7 @@
     "database",
     "api",
     "data",
+    "webhook",
     "use_extras"
   ],
   "properties": {
@@ -65,6 +66,10 @@
     "data": {
       "type": "string",
       "description": "The path (absolute preferred) to the data directory."
+    },
+    "webhook": {
+      "type": "string",
+      "description": "The name of the webhook that proxies messages."
     },
     "use_extras": {
       "type": "boolean",

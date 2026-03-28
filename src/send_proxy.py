@@ -6,6 +6,7 @@ import fluxer
 import re
 
 from .backend.cache import TTLCache
+from .backend.config import Config
 from .backend.database import Database, GuildPreference
 from .backend.models import Proxy
 from .backend.template_utils import Template
@@ -56,12 +57,18 @@ async def get_proxied_messages(message: str, user_id: int, autoproxy: bool, auto
                 return []
     return res
 
+
+@TTLCache(2048, 3600).cache_async(["webhook_id"])
+async def fetch_webhook(bot: fluxer.Bot, webhook_id: int) -> fluxer.Webhook:
+    return await bot.fetch_webhook(str(webhook_id))
+
+
 @TTLCache(2048, 3600).cache_async(["channel_id"])
 async def get_webhook(channel_id: int, bot: fluxer.Bot) -> fluxer.Webhook:
     if webhook_id := await Database.instance.get_channel_webhook(channel_id):
-        webhook = await bot.fetch_webhook(str(webhook_id))
+        webhook = await fetch_webhook(bot, webhook_id)
     else:
-        webhook = await bot.create_webhook(str(channel_id), name="Bucket of Fish")
+        webhook = await bot.create_webhook(str(channel_id), name=Config.instance.webhook)
         await Database.instance.put_channel_webhook_link(channel_id, int(webhook.id))
     return webhook
 
