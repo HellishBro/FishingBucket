@@ -4,3 +4,6 @@ data/emojis.json
 .venv/
 .idea/
 uv.lock
+build/
+*/__pycache__
+*.egg-info
