@@ -191,7 +191,7 @@ def setup(bot: fluxer.Bot):
         if not await valid_template(message, "Tag", new_tag): return
 
         await Database.instance.update_group_tag(group.id, new_tag)
-        example_proxy = Proxy(None, "Example Proxy", "This is an example proxy", Proxy.random_avatar(), ["{}"], 0, 0, 0, group, None)
+        example_proxy = Proxy(None, "Example Proxy", "This is an example proxy", Proxy.random_avatar(), ["{}"], 0, 0, 0, group, None, {}, None)
         embed = fluxer.Embed(
             "Group Updated!",
             f"The tag for *{group.name}* has been changed! Proxies sent using this group will have their name be displayed as **{example_proxy.effective_name}**"

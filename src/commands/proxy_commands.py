@@ -32,7 +32,7 @@ def setup(bot: fluxer.Bot):
         else:
             avatar_url = message.attachments[0].url
 
-        new_proxy = await Database.instance.put_proxy(Proxy(None, name, "", avatar_url, [trigger], int(message.author.id), 0, time.time(), None, ""))
+        new_proxy = await Database.instance.put_proxy(Proxy(None, name, "", avatar_url, [trigger], int(message.author.id), 0, time.time(), None, "", {}, None))
         hex_id = str(hex(new_proxy.id))[2:].lower()
         embed = fluxer.Embed(
             f"{name} (`{hex_id}`)",
