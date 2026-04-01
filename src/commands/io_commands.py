@@ -41,7 +41,7 @@ def setup(bot: fluxer.Bot):
 
         imported_groups = []
         imported_proxies = []
-        if title == "tuppers.json":
+        if "tuppers" in title and title.endswith(".json"):
             m = await response.respond(message, "Loading from Tupperbox!")
             try:
                 res = json.loads(contents)
@@ -64,7 +64,7 @@ def setup(bot: fluxer.Bot):
                 await message.delete()
                 return
 
-        elif title == "proxies.json.gz.a85":
+        elif "proxies" in title and title.endswith(".a85"):
             m = await response.respond(message, "Loading from Fishing Bucket!")
             try:
                 res = json.loads(gzip.decompress(base64.a85decode(contents.encode("utf-8"))).decode("utf-8"))
@@ -87,7 +87,8 @@ def setup(bot: fluxer.Bot):
                 await message.delete()
                 return
 
-        elif title == "system.json":
+
+        elif "system" in title and title.endswith(".json"):
             m = await response.respond(message, "Loading from Pluralkit!")
             try:
                 res = json.loads(contents)
@@ -143,7 +144,7 @@ def setup(bot: fluxer.Bot):
             title = url.split("?")[0].split("/")[-1]
             contents = await read_file(url)
 
-        if title == "tuppers.json":
+        if "tuppers" in title and title.endswith(".json"):
             m = await response.respond(message, "Loading from Tupperbox!")
             try:
                 res = json.loads(contents)
@@ -154,7 +155,7 @@ def setup(bot: fluxer.Bot):
                 await message.delete()
                 return
 
-        elif title == "proxies.json.gz.a85":
+        elif "proxies" in title and title.endswith(".a85"):
             m = await response.respond(message, "Loading from Fishing Bucket!")
             try:
                 res = json.loads(gzip.decompress(base64.a85decode(contents.encode("utf-8"))).decode("utf-8"))
@@ -165,7 +166,7 @@ def setup(bot: fluxer.Bot):
                 await message.delete()
                 return
 
-        elif title == "system.json":
+        elif "system" in title and title.endswith(".json"):
             m = await response.respond(message, "Loading from Pluralkit!")
             try:
                 res = json.loads(contents)
