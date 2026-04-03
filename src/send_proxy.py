@@ -13,7 +13,7 @@ from .backend.models import Proxy
 from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
 from .backend.utils import mention_message, convert_attachments, normalize_emojis, roll_dice, edit_webhook, \
-    get_guild_id_from_channel
+    get_guild_id_from_channel, send_webhook
 from .response import delete_message
 
 
@@ -78,6 +78,8 @@ async def send_proxy_message(proxy: Proxy, message: str, parent_message: fluxer.
     webhook = await get_webhook(channel.id, bot)
 
     embeds = None
+
+    """
     if parent_message:
         proxy_id = await Database.instance.get_proxy_id(parent_message.id, channel.id)
         if proxy_id:
@@ -96,9 +98,11 @@ async def send_proxy_message(proxy: Proxy, message: str, parent_message: fluxer.
         ).to_dict()]
 
         message = f"-# ↩ {mention}\n" + message
+    """
 
     message, embeds = await modify_message(proxy.owner, await Database.instance.get_guild_preferences(channel.guild_id), message, embeds)
-    return await webhook.send(message, embeds=embeds, username=proxy.effective_name, avatar_url=proxy.effective_avatar, files=await convert_attachments(attachments), wait=True)
+    return await send_webhook(webhook, message, embeds=embeds, username=proxy.effective_name, avatar_url=proxy.effective_avatar, files=await convert_attachments(attachments), wait=True, message_reference=parent_message)
+    # return await webhook.send(message, embeds=embeds, username=proxy.effective_name, avatar_url=proxy.effective_avatar, files=await convert_attachments(attachments), wait=True)
 
 
 block_content_regex = re.compile(r"{{(.+?)}}")
@@ -141,13 +145,14 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
     contents = old_message.content
     attachments = old_message.attachments
     embeds = old_message.embeds
+    parent_message = old_message.referenced_message
     webhook = await get_webhook(old_message.channel_id, bot)
     server_preferences = await Database.instance.get_guild_preferences((await bot.fetch_channel(str(old_message.channel_id))).guild_id)
     await old_message.delete()
     await Database.instance.delete_link_message(old_message.id, old_message.channel_id)
     embeds = [embed for embed in embeds if embed["title"] == "Reply"]
     contents, embeds = await modify_message(new_proxy.owner, server_preferences, contents, embeds)
-    m = await webhook.send(contents, embeds=embeds, username=new_proxy.effective_name, avatar_url=new_proxy.effective_avatar, files=await convert_attachments(attachments), wait=True)
+    m = await send_webhook(webhook, contents, embeds=embeds, username=new_proxy.effective_name, avatar_url=new_proxy.effective_avatar, files=await convert_attachments(attachments), wait=True, message_reference=parent_message)
     await Database.instance.transfer_proxy_usage(old_proxy.id, new_proxy.id)
     await Database.instance.set_autoproxy_last_used_proxy(old_proxy.owner, await get_guild_id_from_channel(bot, old_message.channel_id), new_proxy.id)
     await Database.instance.link_message(m.id, m.channel_id, new_proxy.id)

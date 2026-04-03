@@ -1,7 +1,9 @@
+import json
 from datetime import datetime
 from io import BytesIO
 from typing import Any
 
+import aiohttp
 from aiohttp import ClientSession
 import fluxer
 import fluxer.http as fhttp
@@ -160,3 +162,58 @@ def roll_dice(string: str, get_global_environment, set_global_environment) -> tu
         embed = fluxer.Embed(string[:100], f"Error: {e.args[0]}")
         ret = "error"
     return ret, embed
+
+async def send_webhook(webhook: fluxer.Webhook, content: str, *, embeds: list[dict] = None, username: str = None, avatar_url: str = None, files: list[fluxer.File] = None, wait: bool = False, message_reference: fluxer.Message) -> fluxer.Message | None:
+    if not webhook._http:
+        raise RuntimeError("Cannot send with webhook without HTTPClient")
+
+    files = files or []
+
+    route = webhook._http._route(
+        "POST",
+        "/webhooks/{webhook_id}/{token}",
+        webhook_id=webhook.id,
+        token=webhook.token,
+    )
+    payload: dict[str, Any] = {}
+    if content is not None:
+        payload["content"] = content
+    if embeds is not None:
+        payload["embeds"] = embeds
+    if username is not None:
+        payload["username"] = username
+    if avatar_url is not None:
+        payload["avatar_url"] = avatar_url
+    if message_reference is not None:
+        payload["message_reference"] = {
+            "message_id": str(message_reference.id),
+            "channel_id": str(message_reference.channel_id),
+        }
+    params = {"wait": "true"} if wait else None
+    if files:
+        form = aiohttp.FormData()
+        payload["attachments"] = [
+            {"id": i, "filename": file.filename} for i, file in enumerate(files)
+        ]
+        form.add_field(
+            "payload_json",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        for i, file in enumerate(files):
+            form.add_field(
+                f"files[{i}]",
+                file._get_bytes(),
+                filename=file.filename,
+            )
+        data = await webhook._http.request(route, data=form, params=params)
+    else:
+        data = await webhook._http.request(
+            route,
+            json=payload,
+            params=params,
+        )
+
+    if data is not None:
+        return fluxer.Message.from_data(data, webhook._http)
+    return None
