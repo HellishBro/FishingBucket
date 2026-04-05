@@ -278,7 +278,7 @@ async def valid_template(message: fluxer.Message, this: str, trigger: str, top_l
             await response.respond(message, f"Warning: template reading encountered errors while parsing:\n{'\n'.join(('- ' + err) for err in template.errors)}")
 
         if template.get_expr_count() == 0:
-            await response.respond(message, "Error! `" + this + "` must contain the literal `{}` or have an expression slot!")
+            await response.respond(message, "Error! " + this + " must contain the literal `{}` or have an expression slot!")
             return False
 
         for part in template.parts:
@@ -288,9 +288,9 @@ async def valid_template(message: fluxer.Message, this: str, trigger: str, top_l
                         if top_level_variable in part.content:
                             return True
                     if len(top_level_variables) == 1:
-                        await response.respond(message, f"Error! `{this}` must contain the top level variable `{top_level_variables[0]}`, or leave empty.")
+                        await response.respond(message, f"Error! {this} must contain the top level variable `{top_level_variables[0]}`, or leave empty.")
                     else:
-                        await response.respond(message, f"Error! `{this}` must contain at least one of the top level variables: `{'`, `'.join(top_level_variables)}`, or leave empty.")
+                        await response.respond(message, f"Error! {this} must contain at least one of the top level variables: `{'`, `'.join(top_level_variables)}`, or leave empty.")
                     return False
     except TypeError as e:
         await response.respond(message, f"Error! {e}")
