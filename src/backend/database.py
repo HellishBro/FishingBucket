@@ -73,7 +73,8 @@ class Cache:
     proxy_id_from_message = TTLCache[tuple[int, int], int](MID, MEDIUM)
     guild_preferences = TTLCache(SMALL, MEDIUM)
     guild_allows = TTLCache(SMALL, LONG)
-    channel_allows = TTLCache(MEDIUM, LONG)
+    guild_role_allows = TTLCache[int, tuple[tuple[int, bool | None]]](MID, LONG)
+    permission_allows: list[TTLCache[tuple[int, int], bool]] = [TTLCache(MEDIUM, LONG), TTLCache(MEDIUM, LONG), TTLCache(MEDIUM, LONG)]
     webhook_link = TTLCache(MEDIUM, LONG)
     proxies_from_user = TTLCache[int, list[int]](BIG, MEDIUM)
     groups_from_user = TTLCache[int, list[int]](MEDIUM, MEDIUM)
@@ -136,12 +137,14 @@ class Database:
         );
         """)
         await self.connection.execute("""
-        CREATE TABLE IF NOT EXISTS channel_overrides (
-            channel_id INTEGER PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS permission_overrides (
+            id INTEGER,
             guild_id INTEGER,
-            allow_proxy INTEGER
+            allow_proxy INTEGER,
+            id_type INTEGER,
+            PRIMARY KEY (id, guild_id)
         );
-        """)
+        """) # 0 - channel; 1 - role; 2 - user
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS guild_preferences (
             guild_id INTEGER PRIMARY KEY,
@@ -189,7 +192,8 @@ class Database:
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_proxies_group ON proxies (proxy_group);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_message_links_channel ON message_links (channel_id);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_message_links_proxy ON message_links (proxy_id);")
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_channel_overrides_guild ON channel_overrides (guild_id);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_permission_overrides_guild ON permission_overrides (guild_id);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_permission_overrides_id ON permission_overrides (id);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_guild_id ON autoproxies (guild_id);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_user_id ON autoproxies (user_id);")
         await self.connection.execute("PRAGMA journal_mode=WAL;")
@@ -269,6 +273,59 @@ class Database:
             finally:
                 await self.connection.commit()
 
+            version += 1
+
+        if version == 3:
+            try:
+                await self.connection.execute("""
+                ALTER TABLE channel_overrides RENAME TO permission_overrides;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE permission_overrides RENAME COLUMN channel_id TO id;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE permission_overrides ADD COLUMN id_type INTEGER;
+                """)
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
+        if version == 4:
+            try:
+                await self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS permission_overrides_new (
+                    id INTEGER,
+                    guild_id INTEGER,
+                    allow_proxy INTEGER,
+                    id_type INTEGER,
+                    PRIMARY KEY (id, guild_id)
+                );
+                """)
+                await self.connection.execute("""
+                INSERT INTO permission_overrides_new (
+                    id,
+                    guild_id,
+                    allow_proxy,
+                    id_type
+                ) SELECT
+                    id,
+                    guild_id,
+                    allow_proxy,
+                    id_type
+                FROM permission_overrides;
+                """)
+                await self.connection.execute("""
+                DROP TABLE permission_overrides;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE permission_overrides_new RENAME TO permission_overrides;
+                """)
+            except:
+                pass
+            finally:
+                await self.connection.commit()
             version += 1
 
         await self.set_global_data("version", str(version), version)
@@ -425,24 +482,29 @@ class Database:
             if not res: return None
             return res[0]
 
-    async def override_channel(self, channel_id: int, guild_id: int, allow_proxy: str):
+    async def override_permission(self, id_: int, guild_id: int, allow_proxy: str, id_type: int):
         allow_proxy_enum = {"allow": 1, "disallow": -1, "default": 0}[allow_proxy]
         await self.connection.execute(
-            "INSERT INTO channel_overrides (channel_id, guild_id, allow_proxy) VALUES (?, ?, ?) ON CONFLICT(channel_id) DO UPDATE SET allow_proxy = ? WHERE channel_id = ?",
-            (channel_id, guild_id, allow_proxy_enum, allow_proxy_enum, channel_id)
+            "INSERT INTO permission_overrides (id, guild_id, allow_proxy, id_type) VALUES (?, ?, ?, ?) ON CONFLICT(id, guild_id) DO UPDATE SET allow_proxy = ? WHERE id = ?",
+            (id_, guild_id, allow_proxy_enum, id_type, allow_proxy_enum, id_)
         )
         await self.connection.commit()
-        Cache.guild_allows.invalidate(guild_id)
-        Cache.channel_allows.invalidate((channel_id, guild_id))
+        Cache.guild_allows.invalidate((guild_id, id_type))
+        Cache.permission_allows[id_type].invalidate((id_, guild_id))
+        if id_type == 1:
+            Cache.guild_role_allows.invalidate(guild_id)
 
-    async def remove_all_channel_overrides(self, guild_id: int):
+    async def remove_all_overrides(self, guild_id: int):
         await self.connection.execute(
-            "DELETE FROM channel_overrides WHERE guild_id = ?",
-            (guild_id, )
+            "DELETE FROM permission_overrides WHERE guild_id = ?",
+            (guild_id,)
         )
         await self.connection.commit()
-        Cache.guild_allows.invalidate(guild_id)
-        Cache.channel_allows.clear(lambda key, val: key[1] == guild_id)
+        for id_type in range(3):
+            Cache.permission_allows[id_type].clear(lambda key, val: key[1] == guild_id)
+            Cache.guild_allows.invalidate((guild_id, id_type))
+            if id_type == 1:
+                Cache.guild_role_allows.invalidate(guild_id)
 
     async def set_guild_preferences(self, guild_id: int, disallow_by_default: bool | None = None, logging_channel: int | None = None, dice_functions: bytes | None = None):
         names = {
@@ -463,7 +525,10 @@ class Database:
             await self.connection.execute(*upsert_query("guild_preferences", "guild_id", guild_id, names, changes, values))
             await self.connection.commit()
             Cache.guild_preferences.invalidate((guild_id, ))
-            Cache.channel_allows.clear(lambda k, v: k[1] == guild_id)
+            Cache.guild_role_allows.invalidate(guild_id)
+            for i in range(3):
+                Cache.permission_allows[i].clear(lambda k, v: k[1] == guild_id)
+                Cache.guild_allows.invalidate((guild_id, i))
 
     @Cache.guild_preferences.cache_async()
     async def get_guild_preferences(self, guild_id: int) -> GuildPreference:
@@ -475,10 +540,10 @@ class Database:
             return GuildPreference(*res[1:])
 
     @Cache.guild_allows.cache_async()
-    async def get_guild_channel_overrides(self, guild_id: int) -> dict[int, str]:
+    async def get_guild_overrides(self, guild_id: int, id_type: int) -> dict[int, str]:
         async with self.connection.execute(
-            "SELECT channel_id, allow_proxy FROM channel_overrides WHERE guild_id = ?",
-            (guild_id, )
+            "SELECT id, allow_proxy FROM permission_overrides WHERE guild_id = ? AND id_type = ?",
+            (guild_id, id_type)
         ) as cursor:
             res = await cursor.fetchall()
             if not res: return {}
@@ -487,27 +552,63 @@ class Database:
                 d[cid] = {-1: "disallow", 0: "default", 1: "allow"}[allow]
             return d
 
-    @Cache.channel_allows.cache_async()
-    async def get_allow_proxy(self, channel_id: int, guild_id: int) -> bool:
-        async with self.connection.execute(
-            "SELECT allow_proxy FROM channel_overrides WHERE channel_id = ?",
-            (channel_id, )
-        ) as cursor:
-            res = await cursor.fetchone()
+    async def get_allow_proxy(self, channel_id: int, guild_id: int, role_ids: list[int], user_id: int) -> bool:
+        channel_allowed = None
+        guild_allowed = None
+        roles_allowed = None
+        user_allowed = None
 
-            if res:
-                allow,  = res
-                if allow in (-1, 1):
-                    return allow == 1
+        if (channel_allowed := Cache.permission_allows[0].get((channel_id, guild_id))) is None:
+            async with self.connection.execute(
+                "SELECT allow_proxy FROM permission_overrides WHERE id = ? AND id_type = 0",
+                (channel_id,)
+            ) as cursor: # channel
+                res = await cursor.fetchone()
+                if res:
+                    allow, = res
+                    if allow in (-1, 1):
+                        channel_allowed = allow == 1
+                        Cache.permission_allows[0].set((channel_id, guild_id), channel_allowed)
 
-        async with self.connection.execute(
-            "SELECT disallow_by_default FROM guild_preferences WHERE guild_id = ?",
-            (guild_id, )
-        ) as cursor:
-            res = await cursor.fetchone()
-            if not res: return True
-            disallow_by_default, = res
-            return not disallow_by_default
+        if channel_allowed is None:
+            guild_allowed = not (await self.get_guild_preferences(guild_id)).disallow_by_default
+
+        if (all_role_allows := Cache.guild_role_allows.get(guild_id)) is None:
+            async with self.connection.execute(
+                "SELECT id, allow_proxy FROM permission_overrides WHERE guild_id = ? AND id_type = 1",
+                (guild_id,)
+            ) as cursor: # roles
+                pairs = []
+                for res in await cursor.fetchall():
+                    rid, allow = res
+                    if allow in (-1, 1):
+                        pairs.append((rid, allow == 1))
+                    else:
+                        pairs.append((rid, None))
+                all_role_allows = tuple(pairs)
+                Cache.guild_role_allows.set(guild_id, all_role_allows)
+
+        m = dict(all_role_allows)
+        allowed = [m[role] for role in role_ids if m.get(role) is not None]
+        if allowed:
+            roles_allowed = allowed[-1]
+
+        if (user_allowed := Cache.permission_allows[2].get((user_id, guild_id))) is None:
+            async with self.connection.execute(
+                "SELECT allow_proxy FROM permission_overrides WHERE id = ? AND id_type = 2",
+                (user_id,)
+            ) as cursor: # user
+                res = await cursor.fetchone()
+                if res:
+                    allow, = res
+                    if allow in (-1, 1):
+                        user_allowed = allow == 1
+                        Cache.permission_allows[2].set((user_id, guild_id), user_allowed)
+
+        resolution = [guild_allowed, channel_allowed, roles_allowed, user_allowed]
+        resolution = [res for res in resolution if res is not None]
+        if resolution: return resolution[-1]
+        return True
 
     async def put_channel_webhook_link(self, channel_id: int, webhook_id: int):
         await self.connection.execute(

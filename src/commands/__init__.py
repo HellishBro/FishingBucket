@@ -4,6 +4,7 @@ from typing import Any, Callable, Coroutine
 import fluxer
 
 from ..backend.models import Command, optional_type, one_or_more, alternative, command_types, CommandGroup, string_with_length
+from ..backend.utils import get_guild_id_from_channel
 
 command_groups: dict[str, CommandGroup] = {}
 
@@ -149,6 +150,21 @@ async def parse_type(message: fluxer.Message, final: bool, stream: PeekableConsu
             raise ValueError(f"Unknown user!")
 
         return user
+    if current_type == fluxer.Role:
+        err = "Invalid role input!"
+        stream.expect("<", err)
+        stream.expect("@", err)
+        stream.expect("&", err)
+        snowflake = await parse_type(message, final, stream, bot, int)
+        stream.expect(">", err)
+        try:
+            guild = await bot.fetch_guild(str(await get_guild_id_from_channel(bot, message.channel_id)))
+            roles = await guild.fetch_roles()
+            for role in roles:
+                if role.id == snowflake:
+                    return role
+        except: pass
+        raise ValueError(f"Unknown role!")
 
     raise ValueError(
         f"Unrecognized type: {current_type.__name__ if hasattr(current_type, '__name__') else current_type.__class__.__name__}.")

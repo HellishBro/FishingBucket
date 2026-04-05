@@ -196,11 +196,16 @@ async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_m
         await logging_channel.send("", embeds=[embed])
 
 
+@TTLCache(1024, 3600).cache_async(["user", "guild"])
+async def get_member(bot: fluxer.Bot, guild: int, user: int) -> fluxer.GuildMember:
+    return await (await bot.fetch_guild(str(guild))).fetch_member(user)
+
+
 async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
     if not message.guild_id:
         return
 
-    if await Database.instance.get_allow_proxy(int(message.channel_id), int(message.guild_id)):
+    if await Database.instance.get_allow_proxy(int(message.channel_id), int(message.guild_id), (await get_member(bot, await get_guild_id_from_channel(bot, message.channel_id), message.author.id)).roles[::-1], message.author.id):
         guild_id = await get_guild_id_from_channel(bot, message.channel_id)
         autoproxy_prefs = await Database.instance.get_autoproxy_preference(message.author.id, guild_id)
         proxied = await get_proxied_messages(message.content, int(message.author.id), autoproxy_prefs)
