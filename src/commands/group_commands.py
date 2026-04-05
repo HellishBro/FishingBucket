@@ -188,7 +188,7 @@ def setup(bot: fluxer.Bot):
         group = await ensure_own_group(message, id_)
         if not group: return
 
-        if not await valid_template(message, "Tag", new_tag): return
+        if not await valid_template(message, "Tag", new_tag, ["name", "proxy", "group"]): return
 
         await Database.instance.update_group_tag(group.id, new_tag)
         example_proxy = Proxy(None, "Example Proxy", "This is an example proxy", Proxy.random_avatar(), ["{}"], 0, 0, 0, group, None, {}, None)

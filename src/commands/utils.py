@@ -8,7 +8,7 @@ from ..interaction import Interaction, Interactions, remove_reaction
 from .. import response
 from ..backend.database import Database, UserPreference
 from ..backend.models import Proxy, ProxyGroup, string_with_length
-from ..backend.template_utils import Template, TextPart
+from ..backend.template_utils import Template, TextPart, ExprPart
 from ..backend.utils import format_date, get_member, compute_permissions, normalize_emojis
 
 bot: fluxer.Bot = None
@@ -271,15 +271,27 @@ async def ensure_own_group(message: fluxer.Message, id_: str | int) -> ProxyGrou
         return None
     return group
 
-async def valid_template(message: fluxer.Message, this: str, trigger: str) -> bool:
+async def valid_template(message: fluxer.Message, this: str, trigger: str, top_level_variables: list[str]) -> bool:
     try:
         template = Template.from_string(trigger)
         if template.errors:
             await response.respond(message, f"Warning: template reading encountered errors while parsing:\n{'\n'.join(('- ' + err) for err in template.errors)}")
 
         if template.get_expr_count() == 0:
-            await response.respond(message, "Error! " + this + " must contain the literal `{}` or have an expression slot!")
+            await response.respond(message, "Error! `" + this + "` must contain the literal `{}` or have an expression slot!")
             return False
+
+        for part in template.parts:
+            if isinstance(part, ExprPart):
+                if part.content:
+                    for top_level_variable in top_level_variables:
+                        if top_level_variable in part.content:
+                            return True
+                    if len(top_level_variables) == 1:
+                        await response.respond(message, f"Error! `{this}` must contain the top level variable `{top_level_variables}`, or leave empty.")
+                    else:
+                        await response.respond(message, f"Error! `{this}` must contain at least one of the top level variables: `{'`, `'.join(top_level_variables)}`, or leave empty.")
+                    return False
     except TypeError as e:
         await response.respond(message, f"Error! {e}")
         return False
