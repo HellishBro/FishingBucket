@@ -68,7 +68,7 @@ def setup(bot: fluxer.Bot):
     """, 'set triggers <proxy> <"set" OR "add" OR "remove"> [trigger]',
                       ['set triggers 69ed73 add egg: {}', 'set triggers 69ed73 set hi{}!', 'set triggers 69ed73 remove hi{}!', 'set triggers 69ed73 remove', 'set triggers 69ed73 set'], "proxy_act")
     async def change_triggers(message: fluxer.Message, id_: str, mode: str, trigger: str | None):
-        if not await valid_template(message, "Trigger", trigger):
+        if not await valid_template(message, "Trigger", trigger, ["text"]):
             return
 
         if mode == "add" and trigger is None:

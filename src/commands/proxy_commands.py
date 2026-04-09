@@ -23,7 +23,7 @@ def setup(bot: fluxer.Bot):
     Proxy avatar can be set by attaching an image to the message.
     """, "register <name> <trigger>",['register Example example says {}', 'register "Long name" ln: {}'], "proxy")
     async def register(message: fluxer.Message, name: str, trigger: str):
-        if not await valid_template(message, "Trigger", trigger): return
+        if not await valid_template(message, "Trigger", trigger, ["text"]): return
 
         name = normalize_emojis(name)
 
