@@ -74,34 +74,26 @@ async def get_webhook(channel_id: int, bot: fluxer.Bot) -> fluxer.Webhook:
         await Database.instance.put_channel_webhook_link(channel_id, int(webhook.id))
     return webhook
 
-async def send_proxy_message(proxy: Proxy, message: str, parent_message: fluxer.Message | None, channel: fluxer.Channel, bot: fluxer.Bot, attachments: list[fluxer.models.Attachment]) -> fluxer.Message:
+async def send_proxy_message(proxy: Proxy, message: str, parent_message: fluxer.Message | None, channel: fluxer.Channel, bot: fluxer.Bot, attachments: list[fluxer.models.Attachment], mention: bool) -> fluxer.Message:
     webhook = await get_webhook(channel.id, bot)
 
-    embeds = None
-
-    """
     if parent_message:
         proxy_id = await Database.instance.get_proxy_id(parent_message.id, channel.id)
         if proxy_id:
             parent_proxy = await Database.instance.get_proxy(proxy_id)
             mention = f"{parent_proxy.name} (<@{parent_proxy.owner}>)"
-            parent_name = parent_proxy.name
         else:
             mention = f"<@{parent_message.author.id}>"
-            parent_name = parent_message.author.display_name
-
-        trunc = parent_message.content
-        trunc = trunc[:min(250, len(trunc))]
-        embeds = [fluxer.Embed(
-            "Reply",
-            f"[Replying to]({await mention_message(bot, parent_message)}) {parent_name}:\n{'\n'.join(('> ' + line) for line in trunc.split('\n'))}"
-        ).to_dict()]
 
         message = f"-# ↩ {mention}\n" + message
-    """
 
-    message, embeds = await modify_message(proxy.owner, await Database.instance.get_guild_preferences(channel.guild_id), message, embeds)
-    return await send_webhook(webhook, message, embeds=embeds, username=proxy.effective_name, avatar_url=proxy.effective_avatar, files=await convert_attachments(attachments), wait=True, message_reference=parent_message)
+    message, embeds = await modify_message(proxy.owner, await Database.instance.get_guild_preferences(channel.guild_id), message, [])
+    return await send_webhook(
+        webhook, message,
+        embeds=embeds, username=proxy.effective_name, avatar_url=proxy.effective_avatar,
+        files=await convert_attachments(attachments), wait=True, message_reference=parent_message,
+        mention=mention
+    )
     # return await webhook.send(message, embeds=embeds, username=proxy.effective_name, avatar_url=proxy.effective_avatar, files=await convert_attachments(attachments), wait=True)
 
 
@@ -152,7 +144,12 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
     await Database.instance.delete_link_message(old_message.id, old_message.channel_id)
     embeds = [embed for embed in embeds if embed["title"] == "Reply"]
     contents, embeds = await modify_message(new_proxy.owner, server_preferences, contents, embeds)
-    m = await send_webhook(webhook, contents, embeds=embeds, username=new_proxy.effective_name, avatar_url=new_proxy.effective_avatar, files=await convert_attachments(attachments), wait=True, message_reference=parent_message)
+    m = await send_webhook(
+        webhook, contents,
+        embeds=embeds, username=new_proxy.effective_name, avatar_url=new_proxy.effective_avatar,
+        files=await convert_attachments(attachments), wait=True, message_reference=parent_message,
+        mention=bool(old_message.mentions)
+    )
     await Database.instance.transfer_proxy_usage(old_proxy.id, new_proxy.id)
     await Database.instance.set_autoproxy_last_used_proxy(old_proxy.owner, await get_guild_id_from_channel(bot, old_message.channel_id), new_proxy.id)
     await Database.instance.link_message(m.id, m.channel_id, new_proxy.id)
@@ -210,7 +207,12 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
     if not message.guild_id:
         return
 
-    if await Database.instance.get_allow_proxy(int(message.channel_id), int(message.guild_id), (await get_member(bot, await get_guild_id_from_channel(bot, message.channel_id), message.author.id)).roles[::-1], message.author.id):
+    if await Database.instance.get_allow_proxy(
+            int(message.channel_id),
+            int(message.guild_id),
+            (await get_member(bot, await get_guild_id_from_channel(bot, message.channel_id), message.author.id)).roles[::-1],
+            message.author.id
+    ):
         guild_id = await get_guild_id_from_channel(bot, message.channel_id)
         autoproxy_prefs = await Database.instance.get_autoproxy_preference(message.author.id, guild_id)
         proxied = await get_proxied_messages(message.content, int(message.author.id), autoproxy_prefs)
@@ -229,7 +231,7 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
             for proxy, m in proxied:
                 try:
                     try:
-                        msg = await send_proxy_message(proxy, m, parent, channel, bot, message.attachments)
+                        msg = await send_proxy_message(proxy, m, parent, channel, bot, message.attachments, bool(message.mentions))
                     except fluxer.BadRequest as e:
                         await message.reply(f"Messages could not be proxied! `{e}`")
                         return

@@ -595,8 +595,8 @@ class Database:
 
         if (user_allowed := Cache.permission_allows[2].get((user_id, guild_id))) is None:
             async with self.connection.execute(
-                "SELECT allow_proxy FROM permission_overrides WHERE id = ? AND id_type = 2",
-                (user_id,)
+                "SELECT allow_proxy FROM permission_overrides WHERE id = ? AND guild_id = ? AND id_type = 2",
+                (user_id, guild_id)
             ) as cursor: # user
                 res = await cursor.fetchone()
                 if res:

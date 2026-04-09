@@ -163,7 +163,7 @@ def roll_dice(string: str, get_global_environment, set_global_environment) -> tu
         ret = "error"
     return ret, embed
 
-async def send_webhook(webhook: fluxer.Webhook, content: str, *, embeds: list[dict] = None, username: str = None, avatar_url: str = None, files: list[fluxer.File] = None, wait: bool = False, message_reference: fluxer.Message) -> fluxer.Message | None:
+async def send_webhook(webhook: fluxer.Webhook, content: str, *, embeds: list[dict] = None, username: str = None, avatar_url: str = None, files: list[fluxer.File] = None, wait: bool = False, message_reference: fluxer.Message, mention: bool = True) -> fluxer.Message | None:
     if not webhook._http:
         raise RuntimeError("Cannot send with webhook without HTTPClient")
 
@@ -186,8 +186,11 @@ async def send_webhook(webhook: fluxer.Webhook, content: str, *, embeds: list[di
         payload["avatar_url"] = avatar_url
     if message_reference is not None:
         payload["message_reference"] = {
-            "message_id": str(message_reference.id),
-            "channel_id": str(message_reference.channel_id),
+            "message_id": str(message_reference.id)
+        }
+    if mention:
+        payload["allowed_mentions"] = {
+            "parse": ["users"]
         }
     params = {"wait": "true"} if wait else None
     if files:
