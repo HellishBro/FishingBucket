@@ -242,8 +242,8 @@ def setup(bot: fluxer.Bot):
             if proxy.owner == message.author.id:
                 webhook_id = await Database.instance.get_channel_webhook(parent.channel_id)
                 if webhook_id:
-                    await edit_proxy_message(parent, bot, new)
                     await message.delete()
+                    await edit_proxy_message(parent, bot, new)
                     return
             m = await response.respond(message, "You do not own this proxy! This message will expire in 15 seconds.")
             if await Interactions.instance.wait_claim_after(15, m.id, m.author.id):

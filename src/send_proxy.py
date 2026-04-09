@@ -99,7 +99,9 @@ async def send_proxy_message(proxy: Proxy, message: str, parent_message: fluxer.
 
 block_content_regex = re.compile(r"{{(.+?)}}")
 
-async def modify_message(user: int, guild_preferences: GuildPreference, message: str, embeds: list[dict] | None) -> tuple[str, list[dict]]:
+async def modify_message(user: int, guild_preferences: GuildPreference, message: str, embeds: list[dict]) -> tuple[str, list[dict]]:
+    clean_embeds = [embed for embed in embeds if embed.get("footer", {}).get("text", "") != "dice roll"]
+
     embed_list = []
     evaluator = dice.Evaluator()
     fns = (await Database.instance.get_user_preferences(user)).dice_functions
@@ -126,7 +128,7 @@ async def modify_message(user: int, guild_preferences: GuildPreference, message:
         embed_list.append(embed.to_dict())
         return f"`{ret}`"
 
-    result = block_content_regex.sub(construct, message), embed_list + (embeds or [])
+    result = block_content_regex.sub(construct, message), embed_list + clean_embeds
     serialized = env.serialize()
     if serialized != fns:
         await Database.instance.set_user_preferences(user, dice_functions=serialized)
@@ -142,7 +144,6 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
     server_preferences = await Database.instance.get_guild_preferences((await bot.fetch_channel(str(old_message.channel_id))).guild_id)
     await old_message.delete()
     await Database.instance.delete_link_message(old_message.id, old_message.channel_id)
-    embeds = [embed for embed in embeds if embed["title"] == "Reply"]
     contents, embeds = await modify_message(new_proxy.owner, server_preferences, contents, embeds)
     m = await send_webhook(
         webhook, contents,
@@ -165,12 +166,12 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
         await logging_channel.send("", embeds=[embed])
 
 
-def recover_original_message(message: fluxer.Message) -> str:
-    replying = any(embed["title"] == "Reply" for embed in message.embeds)
+def recover_original_message(message: fluxer.Message) -> tuple[str, str]:
+    replying = message.content.startswith("-# ↩ ")
     if replying:
         pre, old_msg = message.content.split("\n", maxsplit=1)
-        return old_msg
-    return message.content
+        return pre, old_msg
+    return "", message.content
 
 
 async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_message_contents: str):
@@ -178,12 +179,10 @@ async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_m
     webhook = await get_webhook(old_message.channel_id, bot)
     proxy = await Database.instance.get_proxy(await Database.instance.get_proxy_id(old_message.id, old_message.channel_id))
     server_preferences = await Database.instance.get_guild_preferences((await bot.fetch_channel(str(old_message.channel_id))).guild_id)
-    embeds = [embed for embed in embeds if embed["title"] == "Reply"]
-    replying = len(embeds) >= 1
+    pre, old_msg = old_message.content.split("\n", maxsplit=1)
     contents, embeds = await modify_message(proxy.owner, server_preferences, new_message_contents, embeds)
     old_msg = old_message.content
-    if replying:
-        pre, old_msg = old_message.content.split("\n", maxsplit=1)
+    if pre:
         contents = pre + "\n" + contents
     m = await edit_webhook(webhook, bot, old_message, contents, embeds)
     logging_channel_id = server_preferences.logging_channel

@@ -114,7 +114,7 @@ def setup(bot: fluxer.Bot):
                 if proxy.owner == usr.id:
                     msg = await bot.fetch_message(str(event.channel_id), str(event.message_id))
                     await remove_reaction(msg, event.emoji.name, usr)
-                    await usr.send(f"Editing message:\n```\n{recover_original_message(msg)}\n```")
+                    await usr.send(f"Editing message:\n```\n{recover_original_message(msg)[1]}\n```")
                     await usr.send("Please enter the new content of the message here:")
                     editing_messages[usr.id] = (msg.channel_id, msg.id)
                     await asyncio.sleep(60)

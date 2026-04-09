@@ -161,6 +161,7 @@ def roll_dice(string: str, get_global_environment, set_global_environment) -> tu
     except ValueError as e:
         embed = fluxer.Embed(string[:100], f"Error: {e.args[0]}")
         ret = "error"
+    embed.set_footer(text="dice roll")
     return ret, embed
 
 async def send_webhook(webhook: fluxer.Webhook, content: str, *, embeds: list[dict] = None, username: str = None, avatar_url: str = None, files: list[fluxer.File] = None, wait: bool = False, message_reference: fluxer.Message, mention: bool = True) -> fluxer.Message | None:
