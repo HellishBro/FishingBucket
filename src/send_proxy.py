@@ -179,7 +179,7 @@ async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_m
     webhook = await get_webhook(old_message.channel_id, bot)
     proxy = await Database.instance.get_proxy(await Database.instance.get_proxy_id(old_message.id, old_message.channel_id))
     server_preferences = await Database.instance.get_guild_preferences((await bot.fetch_channel(str(old_message.channel_id))).guild_id)
-    pre, old_msg = old_message.content.split("\n", maxsplit=1)
+    pre, old_msg = recover_original_message(old_message)
     contents, embeds = await modify_message(proxy.owner, server_preferences, new_message_contents, embeds)
     old_msg = old_message.content
     if pre:
