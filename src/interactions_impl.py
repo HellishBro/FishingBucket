@@ -50,7 +50,7 @@ def setup(bot: fluxer.Bot):
             channel_id, message_id = editing_messages.pop(message.author.id)
             msg = await bot.fetch_message(str(channel_id), str(message_id))
             await edit_proxy_message(msg, bot, message.content)
-            await message.author.send(f"Message edited: {await mention_message(bot, message)}")
+            await message.author.send(f"Message edited: {await mention_message(bot, msg)}")
             return
 
         content = message.content.lower()
