@@ -78,10 +78,12 @@ def setup(bot: fluxer.Bot):
         proxy = await ensure_own_proxy(message, id_)
         if not proxy: return
 
-        new_triggers = proxy.triggers
+        new_triggers = proxy.triggers or []
         if mode == "set":
-            new_triggers = [trigger]
+            if trigger is None: new_triggers = []
+            else: new_triggers = [trigger]
         elif mode == "remove":
+            if trigger is None: new_triggers = []
             if trigger in new_triggers:
                 new_triggers.remove(trigger)
         elif mode == "add":
