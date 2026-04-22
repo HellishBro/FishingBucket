@@ -78,7 +78,7 @@ async def paged(initiator: fluxer.Message, title: str, pages: list[str], page: i
                 await m.add_reaction("➡️")
 
 
-def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detailed = False):
+def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detailed = False, length_limit = 4096) -> tuple[str, int]:
     def list_fields(proxy: Proxy) -> str:
         lines = []
         if (not user_preference.private_group or detailed) and len(bunch) == 1:
@@ -102,10 +102,20 @@ def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detail
                     lines.append(f"> {line}")
         return "\n".join(lines)
 
-    return "\n\n".join(
-        f"**{proxy.name}**{(' (aka **' + proxy.nickname + '**)') if proxy.nickname else ''} (`{str(hex(proxy.id))[2:]}`)\n{list_fields(proxy)}"
-        for proxy in bunch
-    )
+    lines = []
+    chars = 0
+    i = 0
+    for i, proxy in enumerate(bunch):
+        line = f"**{proxy.name}**{(' (aka **' + proxy.nickname + '**)') if proxy.nickname else ''} (`{str(hex(proxy.id))[2:]}`)\n{list_fields(proxy)}"
+        if chars + len(line) > length_limit:
+            if chars == 0:
+                return line[:length_limit - 3] + "...", 1
+            i -= 1
+            break
+        lines.append(line)
+        chars += len(line) + 2
+
+    return "\n\n".join(lines), i + 1
 
 async def paged_proxy_list(message: fluxer.Message, proxies: list[Proxy], title: str, page: int | None, detailed = False):
     if len(proxies):
@@ -119,10 +129,17 @@ async def paged_proxy_list(message: fluxer.Message, proxies: list[Proxy], title:
             for group in groups:
                 description = ("\n" + "\n".join("> " + line for line in group.description.split("\n"))) if group.description else ""
                 group_proxies = [proxy for proxy in proxies if proxy.group == group]
-                group_pages = [
-                    ((f"**Group**: {group.name}" + description + "\n\n") if show_groups else "") + get_proxies_text(group_proxies[p * 5 : p * 5 + 5], preferences, detailed)
-                    for p in range(math.ceil(len(group_proxies) / 5))
-                ]
+                group_title = (f"**Group**: {group.name}" + description + "\n\n") if show_groups else ""
+                group_pages = []
+                i = 0
+                while i < len(group_proxies):
+                    naive_section = group_proxies[i : i + 5]
+                    length_limit = 4096 - len(group_title)
+                    res, succession = get_proxies_text(naive_section, preferences, detailed, length_limit)
+                    if res:
+                        group_pages.append(group_title + res)
+                    i += succession
+
                 pages.extend(group_pages)
 
             group_proxies = [proxy for proxy in proxies if proxy.group is None]
