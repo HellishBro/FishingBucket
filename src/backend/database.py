@@ -628,6 +628,7 @@ class Database:
             return res[0] if res else None
 
     async def put_proxy(self, proxy: Proxy) -> Proxy:
+        proxy.triggers = [t for t in proxy.triggers if t]
         cursor = await self.connection.execute(
             "INSERT INTO proxies (name, description, avatar_url, trigger, owner, times_used, creation_date, proxy_group, nickname, proxy_forms, current_form) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (proxy.name, proxy.description, proxy.avatar_url, "\n".join(proxy.triggers), proxy.owner, proxy.times_used, time.time(), proxy.group.id if proxy.group else None, proxy.nickname, json.dumps(proxy.forms), proxy.current_form)
@@ -706,12 +707,13 @@ class Database:
         await self.connection.commit()
 
     async def update_trigger(self, id_: int, triggers: list[str]):
+        norm = [t for t in triggers if t]
         await self.connection.execute(
             "UPDATE proxies SET trigger = ? WHERE id = ?",
-            ("\n".join(triggers), id_)
+            ("\n".join(norm), id_)
         )
         if prox := await self.get_proxy(id_):
-            prox.triggers = triggers
+            prox.triggers = norm
         await self.connection.commit()
 
     async def update_forms(self, id_: int, forms: dict[str, str]):

@@ -84,7 +84,7 @@ def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detail
         if (not user_preference.private_group or detailed) and len(bunch) == 1:
             lines.append(f"- Group: {proxy.group.name if proxy.group else '*N/A*'}")
         if not user_preference.private_trigger or detailed:
-            lines.append(f"- Triggers: {', '.join(f'`{trigger}`' for trigger in proxy.triggers) if proxy.triggers else '*N/A*'}")
+            lines.append(f"- Triggers: {', '.join(f'`{trigger}`' for trigger in proxy.triggers) if proxy.triggers and any(bool(t) for t in proxy.triggers) else '*N/A*'}")
         lines.append(f"- Avatar: [source]({proxy.avatar_url})")
         if not user_preference.private_forms or detailed:
             if proxy.forms:
