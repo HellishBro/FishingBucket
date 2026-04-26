@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import fluxer
 from fluxer.models import RawReactionActionEvent
@@ -29,6 +30,7 @@ def setup(bot: fluxer.Bot):
     ready = False
 
     editing_messages: dict[int, tuple[int, int]] = {} # user_id => (channel_id, message_id)
+    handled_messages: dict[int, bool] = {}
 
     @bot.event
     async def on_ready():
@@ -43,6 +45,11 @@ def setup(bot: fluxer.Bot):
 
     @bot.event
     async def on_message(message: fluxer.Message):
+        handled_messages[message.id] = True
+        await message_wrapper(message)
+        handled_messages.pop(message.id)
+
+    async def message_wrapper(message: fluxer.Message):
         if message.author.id == bot.user.id: return
         if message.author.bot: return
 
@@ -73,7 +80,8 @@ def setup(bot: fluxer.Bot):
 
     @bot.event
     async def on_message_edit(message: fluxer.Message):
-        await on_message(message)
+        if message.id in handled_messages: return
+        await message_wrapper(message)
 
 
     @bot.event
