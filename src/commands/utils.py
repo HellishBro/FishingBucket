@@ -145,10 +145,15 @@ async def paged_proxy_list(message: fluxer.Message, proxies: list[Proxy], title:
             group_proxies = [proxy for proxy in proxies if proxy.group is None]
         else:
             group_proxies = proxies
-        pages.extend([
-            get_proxies_text(group_proxies[p * 5 : p * 5 + 5], preferences)
-            for p in range(math.ceil(len(group_proxies) / 5))
-        ])
+        group_pages = []
+        i = 0
+        while i < len(group_proxies):
+            naive_section = group_proxies[i: i + 5]
+            res, succession = get_proxies_text(naive_section, preferences, detailed, 4096)
+            if res: group_pages.append(res)
+            i += succession
+        pages.extend(group_pages)
+
         await paged(message, f"{title} ({len(proxies)} total)", pages, page)
     else:
         await message.reply("", embeds=[fluxer.Embed(
