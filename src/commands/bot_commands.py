@@ -55,6 +55,12 @@ def setup(bot: fluxer.Bot):
 
             await paged(message, f"Help: {Config.instance.name}", pages, command_or_page)
 
+    @register_command([], bot, "explain", """
+    What do I do?
+    """, "explain", ["explain"], "bot")
+    async def help_(message: fluxer.Message):
+        await response.respond(message, Template.from_string(DataReader.instance["explain.md"]).compute({"bot": bot, "config": Config.instance}, ""))
+
 
     @register_command([], bot, "ping", "Gets the bot's latency.", "ping", ["ping"], "bot", [], False)
     async def ping(message: fluxer.Message):
