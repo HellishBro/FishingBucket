@@ -28,8 +28,11 @@ def setup(bot: fluxer.Bot):
         if isinstance(command_or_page, str):
             command = command_or_page
             for group in command_groups.values():
-                if command in group.commands:
-                    cmd = group.commands[command]
+                if any(com[0] == command for com in group.commands):
+                    if (command, None) in group.commands:
+                        cmd = group.commands[command, None]
+                    else:
+                        cmd = group.commands[command, False]
                     description = f"**Usage**: {bot.command_prefix}{cmd.usage}\n\n{cmd.description}\n\n**Examples**:\n"
                     description += "\n".join("- `" + bot.command_prefix + example + "`" for example in cmd.examples)
                     await response.respond(message, "", [fluxer.Embed(f"Help: {cmd.name}", description)])
@@ -46,19 +49,28 @@ def setup(bot: fluxer.Bot):
             for group in command_groups.values():
                 page = f"**{group.name}**: {group.description}"
                 for i, c in enumerate(group.commands.values()):
-                    page += f"\n- `{bot.command_prefix}{c.usage}` - {c.description.split('\n')[0]}"
+                    if c.editing != True: # c.editing may be None
+                        page += f"\n- `{bot.command_prefix}{c.usage}` - {c.description.split('\n')[0]}"
                 pages.append(page)
 
             await paged(message, f"Help: {Config.instance.name}", pages, command_or_page)
 
 
-    @register_command([], bot, "ping", "Gets the bot's latency.", "ping", ["ping"], "bot")
+    @register_command([], bot, "ping", "Gets the bot's latency.", "ping", ["ping"], "bot", [], False)
     async def ping(message: fluxer.Message):
         stime = datetime.fromisoformat(message.timestamp)
         m = await response.respond(message, "Pong! Latency is calculating! :ping_pong:")
         end_time = datetime.fromisoformat(m.timestamp)
         diff = end_time - stime
         await m.edit(f"Pong! Latency is {int(diff.microseconds / 1000)}ms! :ping_pong:")
+
+    @register_command([], bot, "ping", "Gets the bot's latency.", "ping", ["ping"], "bot", [], True)
+    async def ping(message: fluxer.Message):
+        stime = datetime.fromisoformat(message.timestamp)
+        m = await response.respond(message, "Pong! Latency is calculating! :ping_pong:\nNote: The latency when editing messages is different from sending messages!")
+        end_time = datetime.fromisoformat(m.timestamp)
+        diff = end_time - stime
+        await m.edit(f"Pong! Latency is {int(diff.microseconds / 1000)}ms! :ping_pong:\nNote: The latency when editing messages is different from sending messages!")
 
 
     @register_command([], bot, "invite", "Invite me to your community!", "invite", ["invite"], "bot")

@@ -198,11 +198,11 @@ def register_group(id_: str, name: str, description: str):
 
 class CommandList:
     def __init__(self):
-        self.registry: dict[str, Callable[[fluxer.Message, str, str], Coroutine[None, None, None]]] = {}
+        self.registry: dict[tuple[str, bool | None], Callable[[fluxer.Message, str, str], Coroutine[None, None, None]]] = {}
         self.aliases: dict[str, str] = {}
 
-    def register(self, command_name: str, aliases: list[str], handler: Callable[[fluxer.Message, str, str], Coroutine[None, None, None]]):
-        self.registry[command_name] = handler
+    def register(self, command_name: str, aliases: list[str], handler: Callable[[fluxer.Message, str, str], Coroutine[None, None, None]], editing: bool | None = None):
+        self.registry[command_name, editing] = handler
         self.registry = dict(sorted(self.registry.items(), key=lambda kv: len(kv[0]), reverse=True))
         for alias in aliases:
             self.aliases[alias] = command_name
@@ -228,11 +228,11 @@ def clear():
 
 
 def register_command(shape: list[command_types], bot: fluxer.Bot, command_name: str, command_description: str,
-                     command_usage: str, examples: list[str], group_id: str, aliases: list[str] = None):
+                     command_usage: str, examples: list[str], group_id: str, aliases: list[str] = None, editing: bool | None = None):
     command_description = "\n".join(line.strip() for line in command_description.strip().split("\n"))
 
     def decorator(f: Callable[[fluxer.Message, ...], Coroutine[None, None, None]]):
-        c = Command(shape, command_name, command_description, command_usage, examples)
+        c = Command(shape, command_name, command_description, command_usage, examples, editing)
         command_groups[group_id].register(c)
 
         async def wrapper(m: fluxer.Message, cmd_name: str, prefix_used: str):
@@ -263,7 +263,7 @@ def register_command(shape: list[command_types], bot: fluxer.Bot, command_name: 
                 if author in users_cd_list:
                     users_cd_list.pop(author)
 
-        command_list.register(command_name, aliases or [], wrapper)
+        command_list.register(command_name, aliases or [], wrapper, editing)
         return wrapper
 
     return decorator

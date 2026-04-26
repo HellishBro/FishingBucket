@@ -195,12 +195,13 @@ class Command:
     description: str
     usage: str
     examples: list[str]
+    editing: bool | None
 
 @dataclass
 class CommandGroup:
     name: str
     description: str
-    commands: dict[str, Command]
+    commands: dict[tuple[str, bool | None], Command]
 
     def register(self, command: Command):
-        self.commands[command.name] = command
+        self.commands[command.name, command.editing] = command

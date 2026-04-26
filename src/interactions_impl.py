@@ -49,7 +49,7 @@ def setup(bot: fluxer.Bot):
         await message_wrapper(message)
         handled_messages.pop(message.id)
 
-    async def message_wrapper(message: fluxer.Message):
+    async def message_wrapper(message: fluxer.Message, editing: bool = False):
         if message.author.id == bot.user.id: return
         if message.author.bot: return
 
@@ -65,12 +65,16 @@ def setup(bot: fluxer.Bot):
             if content.startswith(prefix):
                 command = message.content[len(prefix):].strip()
                 for cmd, handler in command_list.registry.items():
-                    if command.startswith(cmd):
-                        await handler(message, cmd, prefix)
-                        return
+                    if command.startswith(cmd[0]):
+                        if cmd[1] is None or editing is cmd[1]:
+                            await handler(message, cmd[0], prefix)
+                            return
                 for alias, cmd in command_list.aliases.items():
                     if command.startswith(alias):
-                        await command_list.registry[cmd](message, alias, prefix)
+                        if (cmd, None) in command_list.registry:
+                            await command_list.registry[cmd, None](message, alias, prefix)
+                        else:
+                            await command_list.registry[cmd, editing](message, alias, prefix)
                         return
                 await response.respond(message, f"`{command}` is not recognized as a valid command! Use `{bot.command_prefix}help` to view all commands!")
                 return
@@ -81,7 +85,7 @@ def setup(bot: fluxer.Bot):
     @bot.event
     async def on_message_edit(message: fluxer.Message):
         if message.id in handled_messages: return
-        await message_wrapper(message)
+        await message_wrapper(message, True)
 
 
     @bot.event
