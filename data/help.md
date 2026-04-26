@@ -17,6 +17,5 @@ To remove a proxy, use `{bot.command_prefix}remove`!
 
 You can also use :x: to any command response that you've triggered to delete the response!
 Invite me, or see the support community by running `{bot.command_prefix}invite`!
-Support the creation and development of me by using `{bot.command_prefix}donate`!
 
 Use the buttons below to see the commands!
