@@ -159,6 +159,7 @@ def setup(bot: fluxer.Bot):
             ).to_dict()])
 
 
+    '''
     @register_command([], bot, "donate", """
     Donate to support the bot's development!
     """, "donate", ["donate"], "bot")
@@ -167,3 +168,4 @@ def setup(bot: fluxer.Bot):
             "Support the Bot!",
             f"I have a donation link now! You can donate to me to support {Config.instance.name}'s development! [{Config.instance.donation}]({Config.instance.donation})."
         )])
+    '''
