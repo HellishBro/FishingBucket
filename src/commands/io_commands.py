@@ -9,7 +9,7 @@ import fluxer
 from .. import response
 from ..backend.database import Database
 from ..commands import register_command, register_group
-from ..import_helper import import_tupperbox, import_native, import_pluralkit, export_native
+from ..import_helper import import_tupperbox, import_native, import_pluralkit, export_native, import_utter
 from ..backend.models import optional_type
 from ..backend.utils import read_file
 
@@ -26,6 +26,7 @@ def setup(bot: fluxer.Bot):
     - Fishing Bucket
     - Tupperbox
     - Pluralkit
+    - Utter
     """, "import [file url]", ["import", "import https://example.com/proxies.json.gz.a85"], "io")
     async def reimport(message: fluxer.Message, url: str | None):
         if not message.attachments and not url:
@@ -47,7 +48,7 @@ def setup(bot: fluxer.Bot):
                 groups, proxies = import_tupperbox(res, int(message.author.id))
             except Exception as e:
                 print(f"{e} when loading from Tupperbox: {contents}")
-                await m.reply("Error! Cannot load from Tupperbox! Is the uploaded file corrupted?")
+                await response.respond(message, "Error! Cannot load from Tupperbox! Is the uploaded file corrupted?")
                 await message.delete()
                 return
 
@@ -58,7 +59,18 @@ def setup(bot: fluxer.Bot):
                 groups, proxies = import_native(res, int(message.author.id))
             except Exception as e:
                 print(f"{e} when loading from Fishing Bucket: {contents}")
-                await m.reply(f"Error! Cannot load from Fishing Bucket! Is the uploaded file corrupted?")
+                await response.respond(message, f"Error! Cannot load from Fishing Bucket! Is the uploaded file corrupted?")
+                await message.delete()
+                return
+
+        elif "utter" in title and title.endswith(".json"):
+            m = await response.respond(message, "Loading from Utter!")
+            try:
+                res = json.loads(contents)
+                groups, proxies = import_utter(res, int(message.author.id))
+            except Exception as e:
+                print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
+                await response.respond(message, f"Error! Cannot load from Utter! Is the uploaded file corrupted?")
                 await message.delete()
                 return
 
@@ -70,7 +82,7 @@ def setup(bot: fluxer.Bot):
             except Exception as e:
                 print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
                 # print(f"{e} when loading from Pluralkit: {contents}")
-                await m.reply(f"Error! Cannot load from Pluralkit! Is the uploaded file corrupted?")
+                await response.respond(message, f"Error! Cannot load from Pluralkit! Is the uploaded file corrupted?")
                 await message.delete()
                 return
 

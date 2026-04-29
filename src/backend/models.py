@@ -1,4 +1,5 @@
 import random
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -56,6 +57,9 @@ class ProxyGroup:
             None
         )
 
+valid_url = re.compile("https?://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)")
+def is_valid_url(string: str) -> bool:
+    return bool(valid_url.fullmatch(string))
 
 @dataclass
 class Proxy:
@@ -129,6 +133,23 @@ class Proxy:
             datetime.fromisoformat(pluralkit["created"]).timestamp() if pluralkit["created"] else time.time(),
             None,
             pluralkit["display_name"],
+            {},
+            None
+        )
+
+    @classmethod
+    def from_utter(cls, utter: dict, owner: int) -> Proxy | None:
+        return cls(
+            None,
+            utter.get("name", ""),
+            utter.get("description", ""),
+            utter.get("avatar_url", "") if is_valid_url(utter.get("avatar_url", "")) else Proxy.random_avatar(),
+            [cls.process_trigger_part(i["prefix"] or "") + "{}" + cls.process_trigger_part(i["suffix"] or "") for i in utter["proxy_tags"]] or [],
+            owner,
+            0,
+            time.time(),
+            None,
+            utter.get("display_name", None),
             {},
             None
         )

@@ -119,3 +119,24 @@ def import_pluralkit(json: dict, owner: int) -> tuple[list[ProxyGroup], list[Pro
         parsed_groups.append(g)
 
     return parsed_groups, [*member_mapping.values()]
+
+def import_utter(json: dict, owner: int) -> tuple[list[ProxyGroup], list[Proxy]]:
+    name = json.get("name", "New System")
+    members = json.get("members", [])
+    tag = json.get("tag", "")
+    name_format = json.get("config", {}).get("name_format", "{name} {tag}")
+
+    group = None
+    group_tag = name_format.replace("{name}", "{}").replace("{tag}", tag).replace("{rawname}", "{proxy.name}").replace("{description}", "{proxy.description}").strip()
+    if group_tag != "{}":
+        group = ProxyGroup(None, name, "This group is an Utter import!", owner, time.time(), group_tag, None)
+
+    parsed_members = []
+    for member in members:
+        p = Proxy.from_utter(member, owner)
+        p.group = group
+        parsed_members.append(p)
+
+    return [group] if group else [], parsed_members
+
+
