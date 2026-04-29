@@ -61,17 +61,24 @@ async def get_proxied_messages(message: str, user_id: int, autoproxy_preferences
 
 
 @TTLCache(2048, 3600).cache_async(["webhook_id"])
-async def fetch_webhook(bot: fluxer.Bot, webhook_id: int) -> fluxer.Webhook:
-    return await bot.fetch_webhook(str(webhook_id))
+async def fetch_webhook(bot: fluxer.Bot, webhook_id: int) -> fluxer.Webhook | None:
+    try:
+        return await bot.fetch_webhook(str(webhook_id))
+    except fluxer.FluxerException:
+        return None
 
 
 @TTLCache(2048, 3600).cache_async(["channel_id"])
 async def get_webhook(channel_id: int, bot: fluxer.Bot) -> fluxer.Webhook:
+    webhook = None
+
     if webhook_id := await Database.instance.get_channel_webhook(channel_id):
         webhook = await fetch_webhook(bot, webhook_id)
-    else:
+
+    if webhook is None:
         webhook = await bot.create_webhook(str(channel_id), name=Config.instance.webhook)
         await Database.instance.put_channel_webhook_link(channel_id, int(webhook.id))
+
     return webhook
 
 async def send_proxy_message(proxy: Proxy, message: str, parent_message: fluxer.Message | None, channel: fluxer.Channel, bot: fluxer.Bot, attachments: list[fluxer.models.Attachment], mention: bool) -> fluxer.Message:

@@ -612,8 +612,8 @@ class Database:
 
     async def put_channel_webhook_link(self, channel_id: int, webhook_id: int):
         await self.connection.execute(
-            "INSERT INTO channel_webhook_map (channel_id, webhook_id) VALUES (?, ?)",
-            (channel_id, webhook_id)
+            "INSERT INTO channel_webhook_map (channel_id, webhook_id) VALUES (?, ?) ON CONFLICT(channel_id) DO UPDATE SET webhook_id = ?",
+            (channel_id, webhook_id, webhook_id)
         )
         Cache.webhook_link.invalidate((channel_id, ))
         await self.connection.commit()
