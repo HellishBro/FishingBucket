@@ -1,43 +1,35 @@
-from aiohttp.web import *
 import aiohttp
+from fastapi import HTTPException
+from fastapi.params import Depends
+from fastapi.responses import RedirectResponse
 
-from .api_database import Database, Session
+from .api_app import Application, require_session
+from .api_database import Session, Database
 from .model_json_adapter import to_json
-from .routing import RouteTable
-from .api_app import Application
 
 app = Application()
+router = app.create_router("/api/v1")
 
-routes = RouteTable(app, "/api/v1")
-get, post = routes.get, routes.post
-
-@get("/proxy/{proxy_id}")
-@app.require_session
-async def _(request: Request, session: Session) -> Response:
-    proxy = await app.context.database.get_proxy(int(request.match_info["proxy_id"]))
-    if not proxy:
-        raise HTTPNotFound()
+@router.get("/proxy/{proxy_id}")
+async def _(proxy_id: int, session: Session = Depends(require_session)):
+    proxy = await app.context.database.get_proxy(proxy_id)
     if session.user_id == proxy.owner:
-        return json_response(to_json(proxy))
-    raise HTTPForbidden()
+        return to_json(proxy)
+    raise HTTPException(403, "Missing permissions to view proxy, or the proxy does not exist!")
 
-@get("/group/{group_id}")
-@app.require_session
-async def _(request: Request, session: Session) -> Response:
-    group = await app.context.database.get_group(int(request.match_info["group_id"]))
-    if not group:
-        raise HTTPNotFound()
+@router.get("/group/{group_id}")
+async def _(group_id: int, session: Session = Depends(require_session)):
+    group = await app.context.database.get_group(group_id)
     if session.user_id == group.owner:
-        return json_response(to_json(group))
-    raise HTTPForbidden()
+        return to_json(group)
+    raise HTTPException(403, "Missing permissions to view group, or the group does not exist!")
 
-@get("/auth")
-async def _(request: Request) -> Response:
-    raise HTTPFound(f"https://web.fluxer.app/oauth2/authorize?client_id={app.context.config.api_server.client_id}&scope=identify&redirect_uri={app.context.config.api_server.url}/api/v1/redirect")
+@router.get("/auth")
+async def _():
+    return RedirectResponse(f"https://web.fluxer.app/oauth2/authorize?client_id={app.context.config.api_server.client_id}&scope=identify&redirect_uri={app.context.config.api_server.url}/api/v1/redirect")
 
-@get("/redirect")
-async def _(request: Request) -> Response:
-    code = request.url.query["code"]
+@router.get("/redirect")
+async def _(code: str):
     async with aiohttp.ClientSession() as session:
         payload = {
             "grant_type": "authorization_code",
@@ -49,13 +41,11 @@ async def _(request: Request) -> Response:
         form_data = aiohttp.FormData(payload)
         async with session.post(f"{app.context.config.api_url}/oauth2/token", data=form_data) as resp:
             data = await resp.json()
-            print(data)
             access_token = data["access_token"]
             async with session.get(f"{app.context.config.api_url}/users/@me", headers={"Authorization": "Bearer " + access_token}) as resp_user:
                 obj = await resp_user.json()
-                print(obj)
                 user_id = int(obj["id"])
                 session_id = await Database.instance.new_session(user_id, obj)
-                return json_response({
+                return {
                     "session_id": session_id
-                })
+                }

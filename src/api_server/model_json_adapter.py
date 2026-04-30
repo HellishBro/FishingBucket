@@ -25,7 +25,9 @@ def _to_json_proxy(proxy: Proxy) -> dict:
         "creation_date": proxy.creation_date,
         "group": proxy.group.id if proxy.group else None,
         "nickname": proxy.nickname,
-        "effective_name": proxy.effective_name
+        "effective_name": proxy.effective_name,
+        "forms": proxy.forms,
+        "current_form": proxy.current_form
     }
 
 def _to_json_proxygroup(group: ProxyGroup) -> dict:

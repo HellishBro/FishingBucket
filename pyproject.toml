@@ -8,7 +8,8 @@ dependencies = [
     "fluxer-py==0.4.1",
     "typer",
     "textdistance[DamerauLevenshtein]",
-    "brotli",
     "cel-python",
-    "expr_dice_roller>=0.0.6"
+    "expr_dice_roller>=0.0.6",
+    "fastapi>=0.136.1",
+    "uvicorn>=0.46.0",
 ]

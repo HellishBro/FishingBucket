@@ -1,4 +1,3 @@
-import ast
 import asyncio
 import traceback
 import fluxer
@@ -28,7 +27,7 @@ def run(config_file: str):
         from .extras.nothing import no_op_coro as report_bot
 
     async def run_once():
-        starts = [asyncio.Future(), bot.start(Config.instance.token)] #, api_app.serve()]
+        starts = [asyncio.Future(), bot.start(Config.instance.token), api_app.serve()]
         if Config.instance.use_extras:
             from .extras.tips_service import tip_loop
             starts.append(tip_loop(bot, lambda: interactions_impl.ready))
