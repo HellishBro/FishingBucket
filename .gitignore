@@ -3,6 +3,7 @@ config*
 data/emojis.json
 .venv/
 .idea/
+.zed/
 uv.lock
 build/
 */__pycache__
