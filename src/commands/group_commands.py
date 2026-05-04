@@ -9,7 +9,7 @@ from ..backend.database import Database
 from ..commands import register_command, register_group
 from ..interaction import Interaction, remove_reaction, Interactions
 from ..backend.models import optional_type, one_or_more, ProxyGroup, Proxy
-from ..backend.utils import get_guild_id_from_channel
+from ..backend.utils import get_guild_id_from_channel, normalize_emojis
 
 
 def setup(bot: fluxer.Bot):
@@ -187,6 +187,8 @@ def setup(bot: fluxer.Bot):
     async def group_tag(message: fluxer.Message, id_: str, new_tag: str):
         group = await ensure_own_group(message, id_)
         if not group: return
+        
+        new_tag = normalize_emojis(new_tag)
 
         if not await valid_template(message, "Tag", new_tag, ["name", "proxy", "group"]): return
 
