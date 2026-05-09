@@ -101,6 +101,10 @@
       "type": "object",
       "description": "Configuration for the API server.",
       "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to start the API server or not."
+        },
         "domain": {
           "type": "string",
           "format": "uri",

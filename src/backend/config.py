@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ApiServer:
+    enabled: bool
     domain: str
     port: int
     client_secret: str
