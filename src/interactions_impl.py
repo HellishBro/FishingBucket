@@ -129,7 +129,7 @@ def setup(bot: fluxer.Bot):
                     await usr.send(f"Editing message:\n```\n{recover_original_message(msg)[1]}\n```")
                     await usr.send("Please enter the new content of the message here:")
                     editing_messages[usr.id] = (msg.channel_id, msg.id)
-                    await asyncio.sleep(60)
+                    await asyncio.sleep(120)
                     if usr.id in editing_messages:
                         await usr.send("Message edit request expired!")
                         editing_messages.pop(usr.id)
