@@ -16,7 +16,7 @@ class Session:
     expires: float
 
 class Cache:
-    sessions = TTLCache[str, Session](4096, 3600)
+    sessions: TTLCache[str, Session] = TTLCache(4096, 3600)
 
 SESSION_TTL = 3600 * 24
 
@@ -80,3 +80,7 @@ class Database:
         )
         await self.connection.commit()
         return session_id
+
+    async def remove_all_sessions(self, user_id: int):
+        async with self.connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id, )):
+            Cache.sessions.clear(lambda k, v: v.user_id == user_id)

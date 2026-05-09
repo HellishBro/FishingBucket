@@ -12,4 +12,5 @@ dependencies = [
     "expr_dice_roller>=0.0.6",
     "fastapi>=0.136.1",
     "uvicorn>=0.46.0",
+    "pydantic",
 ]

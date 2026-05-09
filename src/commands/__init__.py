@@ -206,7 +206,7 @@ class CommandList:
         self.registry = dict(sorted(self.registry.items(), key=lambda kv: len(kv[0][0]), reverse=True))
         for alias in aliases:
             self.aliases[alias] = command_name
-            self.aliases = dict(sorted(self.aliases.items(), key=lambda kv: len(kv[0][0]), reverse=True))
+            self.aliases = dict(sorted(self.aliases.items(), key=lambda kv: len(kv[0]), reverse=True))
 
     def clear(self):
         self.registry.clear()
