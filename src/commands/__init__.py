@@ -203,10 +203,10 @@ class CommandList:
 
     def register(self, command_name: str, aliases: list[str], handler: Callable[[fluxer.Message, str, str], Coroutine[None, None, None]], editing: bool | None = None):
         self.registry[command_name, editing] = handler
-        self.registry = dict(sorted(self.registry.items(), key=lambda kv: len(kv[0]), reverse=True))
+        self.registry = dict(sorted(self.registry.items(), key=lambda kv: len(kv[0][0]), reverse=True))
         for alias in aliases:
             self.aliases[alias] = command_name
-            self.aliases = dict(sorted(self.aliases.items(), key=lambda kv: len(kv[0]), reverse=True))
+            self.aliases = dict(sorted(self.aliases.items(), key=lambda kv: len(kv[0][0]), reverse=True))
 
     def clear(self):
         self.registry.clear()
