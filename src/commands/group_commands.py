@@ -20,7 +20,7 @@ def setup(bot: fluxer.Bot):
     Groups help you organize different proxies that are related in some way.
     """, "group register <name> [description]",
                       ['group register "The Boys"', 'group register "The Girls" "Powerpuff Girls but grown up"',
-                       'group register "The System"'], "group")
+                       'group register "The System"'], "group", ["g r"])
     async def group_register(message: fluxer.Message, name: str, description: str | None):
         description = description or ""
         g = await Database.instance.put_group(ProxyGroup(None, name, description, message.author.id, time.time(), "", None))
@@ -32,7 +32,7 @@ def setup(bot: fluxer.Bot):
     @register_command([optional_type(int)], bot, "group list", """
     Lists your proxy groups.
     This will only list the groups themselves, not the proxies in the groups.
-    """, "group list [page]", ["group list", "group list 2"], "group")
+    """, "group list [page]", ["group list", "group list 2"], "group", ["g l"])
     async def group_list(message: fluxer.Message, page: int | None):
         detailed = False
         if (await get_guild_id_from_channel(bot, message.channel_id)) is None:
@@ -43,7 +43,7 @@ def setup(bot: fluxer.Bot):
 
     @register_command([str, optional_type(int)], bot, "group members", """
     Views all members that belonged to a group.
-    """, "group members <group> [page]", ["group members 2d7", "group members 2d7 5"], "group")
+    """, "group members <group> [page]", ["group members 2d7", "group members 2d7 5"], "group", "g m")
     async def group_members(message: fluxer.Message, group_id: str, page: int | None):
         if not (group := await ensure_own_group(message, group_id)): return
         proxies = await Database.instance.get_user_proxies(message.author.id)
@@ -58,7 +58,7 @@ def setup(bot: fluxer.Bot):
     @register_command([str, one_or_more(str)], bot, "group add", """
     Adds proxies to a proxy group.
     Each proxy can only belong in one proxy group. To remove a proxy from its group, use `group ungroup`.
-    """, 'group add <group> <proxy(s)>', ["group add 2d7 69ed73"], "group")
+    """, 'group add <group> <proxy(s)>', ["group add 2d7 69ed73"], "group", ["g a"])
     async def group_add(message: fluxer.Message, group_id: str, proxy_ids: list[str]):
         if not (group := await ensure_own_group(message, group_id)): return
         proxies = []
@@ -80,7 +80,7 @@ def setup(bot: fluxer.Bot):
     @register_command([str, one_or_more(str)], bot, "group add group", """
     Adds groups to a proxy group.
     This enables nested groups. To remove a group from its group, use `group ungroup group`.
-    """, 'group add group <group> <group(s)>', ["group add 2d7 2d8 2d9"], "group")
+    """, 'group add group <group> <group(s)>', ["group add group 2d7 2d8 2d9"], "group", ["g a g"])
     async def group_add_group(message: fluxer.Message, group_id: str, group_ids: list[str]):
         if not (group := await ensure_own_group(message, group_id)): return
         groups = []
@@ -101,7 +101,7 @@ def setup(bot: fluxer.Bot):
     @register_command([one_or_more(str)], bot, "group ungroup", """
     Ungroups proxies from their proxy groups.
     This will make the proxies listed uncategorized.
-    """, "group ungroup <proxy(s)>", ["group ungroup 69ed73"], "group")
+    """, "group ungroup <proxy(s)>", ["group ungroup 69ed73"], "group", ["g u"])
     async def group_ungroup(message: fluxer.Message, proxy_ids: list[str]):
         proxies = []
         for proxy in proxy_ids:
@@ -122,7 +122,7 @@ def setup(bot: fluxer.Bot):
 
     @register_command([one_or_more(str)], bot, "group ungroup group", """
     Ungroups groups from their groups.
-    """, "group ungroup group <group(s)>", ["group ungroup 2d8 2d9"], "group")
+    """, "group ungroup group <group(s)>", ["group ungroup group 2d8 2d9"], "group", ["g u g"])
     async def group_ungroup(message: fluxer.Message, group_ids: list[str]):
         groups = []
         for g in group_ids:
@@ -143,7 +143,7 @@ def setup(bot: fluxer.Bot):
     @register_command([str], bot, "group remove", """
     Removes a proxy group that you own.
     All proxies within the group will be automatically ungrouped.
-    """, "group remove <group>", ["group remove 2d7"], "group")
+    """, "group remove <group>", ["group remove 2d7"], "group", ["g remove"])
     async def proxy_remove(message: fluxer.Message, id_: str):
         group = await ensure_own_group(message, id_)
         if not group: return
@@ -166,7 +166,7 @@ def setup(bot: fluxer.Bot):
 
     @register_command([str, proxy_username], bot, "group name", """
     Updates a proxy group's name.
-    """, "group name <group> <new name>", ['group name 2d7 "The Radicals"'], "group")
+    """, "group name <group> <new name>", ['group name 2d7 "The Radicals"'], "group", ["g n"])
     async def group_name(message: fluxer.Message, id_: str, new_name: str):
         group = await ensure_own_group(message, id_)
         if not group: return
@@ -183,7 +183,7 @@ def setup(bot: fluxer.Bot):
     Updates a proxy group's tag.
     A tag appears in the proxy name of that group. A proxy tag must contain the literal `{}` as the placeholder for the proxy's name, similar to proxy triggers.
     If not provided, the proxy tag will be cleared.
-    """, "group tag <group> [proxy tag]", ['group tag 2d7 "{} | TR"'], "group")
+    """, "group tag <group> [proxy tag]", ['group tag 2d7 "{} | TR"'], "group", ["g t"])
     async def group_tag(message: fluxer.Message, id_: str, new_tag: str):
         group = await ensure_own_group(message, id_)
         if not group: return
@@ -204,7 +204,7 @@ def setup(bot: fluxer.Bot):
     @register_command([str, str], bot, "group description", """
     Updates a proxy group's description.
     """, "group description <group> <new description>",
-                      ['group description 2d7 Seven days ago, on a faithful day...'], "group")
+                      ['group description 2d7 Seven days ago, on a faithful day...'], "group", ["g d"])
     async def group_name(message: fluxer.Message, id_: str, new_description: str):
         group = await ensure_own_group(message, id_)
         if not group: return

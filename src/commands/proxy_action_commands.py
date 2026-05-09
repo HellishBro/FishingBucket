@@ -41,7 +41,7 @@ def setup(bot: fluxer.Bot):
     Updates a proxy's avatar.
     The new avatar could be attached to the message or passed down as a link in the `url` argument.
     """, "set avatar <proxy> [url]", ["set avatar 69ed73", "set avatar 69ed73 https://example.com/avatar.png"],
-                      "proxy_act")
+                      "proxy_act", ["s a", "s add"])
     async def change_avatar(message: fluxer.Message, id_: str, url: str | None):
         proxy = await ensure_own_proxy(message, id_)
         if not proxy: return
@@ -66,7 +66,7 @@ def setup(bot: fluxer.Bot):
     If the mode is set to `add`, then the `trigger` parameter is required, and it will be appended to the trigger list.
     If the mode is set to `remove`, then it will try to remove `trigger` from the trigger list, and if none is supplied, it will remove all triggers.
     """, 'set triggers <proxy> <"set" OR "add" OR "remove"> [trigger]',
-                      ['set triggers 69ed73 add egg: {}', 'set triggers 69ed73 set hi{}!', 'set triggers 69ed73 remove hi{}!', 'set triggers 69ed73 remove', 'set triggers 69ed73 set'], "proxy_act")
+                      ['set triggers 69ed73 add egg: {}', 'set triggers 69ed73 set hi{}!', 'set triggers 69ed73 remove hi{}!', 'set triggers 69ed73 remove', 'set triggers 69ed73 set'], "proxy_act", ["s t", "s triggers"])
     async def change_triggers(message: fluxer.Message, id_: str, mode: str, trigger: str | None):
         if not await valid_template(message, "Trigger", trigger, ["text"]):
             return
@@ -102,7 +102,7 @@ def setup(bot: fluxer.Bot):
     The `new name` argument will be displayed as the name of your proxy after changing it, only if there is no nickname.
     Names can be used in place of proxy IDs in commands.
     """, "set name <proxy> <new name>", ['set name 69ed73 "Sweet Little Egghead"', 'set name 69ed73 Chloe'],
-                      "proxy_act")
+                      "proxy_act", ["s n", "s name"])
     async def change_name(message: fluxer.Message, id_: str, new_name: str):
         proxy = await ensure_own_proxy(message, id_)
         if not proxy: return
@@ -121,7 +121,7 @@ def setup(bot: fluxer.Bot):
     The `new nickname` argument will always be displayed as the name of your proxy after changing it.
     If `new nickname` is not provided, the nickname will instead be cleared
     """, "set nickname <proxy> [new nickname]", ['set nickname 69ed73', 'set nickname 69ed73 "Chloe (she/her)"'],
-                      "proxy_act")
+                      "proxy_act", ["s nick", "set nick"])
     async def change_nickname(message: fluxer.Message, id_: str, new_nickname: str | None):
         proxy = await ensure_own_proxy(message, id_)
         if not proxy: return
@@ -141,7 +141,7 @@ def setup(bot: fluxer.Bot):
     If `new description` is not provided, the description for the proxy will be cleared.
     """, 'set description <proxy> [new description]',
                       ['set description 69ed73 Caring; sweet; likes puppies.', 'set description 69ed73'],
-                      "proxy_act")
+                      "proxy_act", ["s d", "s description"])
     async def change_description(message: fluxer.Message, id_: str, new_description: str | None):
         proxy = await ensure_own_proxy(message, id_)
         if not proxy: return
@@ -170,7 +170,7 @@ def setup(bot: fluxer.Bot):
     If the mode is set to `remove`, then it will try to remove `form name` from the forms list, and if none is supplied, it will remove all forms.
     Form avatar can either be a URL or submitted as an attachment.
     """, 'set forms <proxy> <"set" OR "add" OR "remove"> [form name] [form avatar]',
-                      ['set forms 69ed73 add "Midnight Form" https://example.com/avatar.png', 'set forms 69e73 set'], "proxy_act")
+                      ['set forms 69ed73 add "Midnight Form" https://example.com/avatar.png', 'set forms 69e73 set'], "proxy_act", ["s forms"])
     async def change_forms(message: fluxer.Message, id_: str, mode: str, form_name: str | None, form_avatar: str | None):
         if mode == "add" and form_name is None:
             await response.respond(message, 'Error! "add" mode must have forms to add!')
@@ -222,7 +222,7 @@ def setup(bot: fluxer.Bot):
     @register_command([str, optional_type(str)], bot, "set form", """
     Sets the current form of the proxy.
     If the form is not provided, the form will be cleared.
-    """, "set form <proxy> [form]", ['set form 69ed73 "Midnight Form"', "set form 69ed73"], "proxy_act")
+    """, "set form <proxy> [form]", ['set form 69ed73 "Midnight Form"', "set form 69ed73"], "proxy_act", ["s f", "s form"])
     async def set_form(message: fluxer.Message, id_: str, form: str | None):
         proxy = await ensure_own_proxy(message, id_)
         if not proxy: return

@@ -21,7 +21,7 @@ def setup(bot: fluxer.Bot):
     Registers a proxy to be used.
     The trigger is a string that contains `{}` somewhere.
     Proxy avatar can be set by attaching an image to the message.
-    """, "register <name> <trigger>",['register Example example says {}', 'register "Long name" ln: {}'], "proxy")
+    """, "register <name> <trigger>",['register Example example says {}', 'register "Long name" ln: {}'], "proxy", ["r"])
     async def register(message: fluxer.Message, name: str, trigger: str):
         if not await valid_template(message, "Trigger", trigger, ["text"]): return
 
@@ -46,7 +46,7 @@ def setup(bot: fluxer.Bot):
     Lists your registered proxies.
     If `user` is provided, it will display the proxies of that user, and if not provided, it will default to your proxies.
     If `page` is provided, it will display the proxies on that page number. Defaults to 1.
-    """, "list [user] [page]", ["list", "list 4", "list @Gordon", "list @Phil 43"], "proxy")
+    """, "list [user] [page]", ["list", "list 4", "list @Gordon", "list @Phil 43"], "proxy", ["l"])
     async def list_(message: fluxer.Message, user: fluxer.User | None, page: int | None):
         uid = user.id if user else message.author.id
         name = user.display_name if user else message.author.display_name
@@ -71,7 +71,7 @@ def setup(bot: fluxer.Bot):
     Finds all your proxies matching a name.
     If `page` is provided, it will display the proxies on that page number. Defaults to 1.
     The `name` is searched via fuzzy text searching. It will match if any portion of the name is matched, regardless of capitalization.
-    """, "find <name> [page]", ['find Example', 'find "Usain Bolt" 2'], "proxy")
+    """, "find <name> [page]", ['find Example', 'find "Usain Bolt" 2'], "proxy", ["f"])
     async def find(message: fluxer.Message, name: str, page: int | None):
         detailed = False
         if (await get_guild_id_from_channel(bot, message.channel_id)) is None:
@@ -102,7 +102,7 @@ def setup(bot: fluxer.Bot):
     Changes the proxy of your message in this channel.
     This will delete and resend your previous proxied message in this channel.
     Alternatively, reply to a message to reproxy that message instead.
-    """, "reproxy <new proxy>", ["reproxy 69ed73"], "proxy")
+    """, "reproxy <new proxy>", ["reproxy 69ed73"], "proxy", ["rp"])
     async def reproxy(message: fluxer.Message, new_id: str):
         channel_id = message.channel_id
         if message.referenced_message:
@@ -134,7 +134,7 @@ def setup(bot: fluxer.Bot):
     You can still use proxies normally. Any explicit proxy message will override the autoproxy for that message only.
     If `expires` is set, then the autoproxy will automatically expire after `expires` seconds.
     The mode can be "all" if and only if autoproxy is being disabled.
-    """, 'autoproxy <"latch" OR enabled OR proxy> <"global" OR "community" OR "all"> [expires OR "never"]', ["autoproxy latch global", "autoproxy off community", "autoproxy 69ed73 global 3600"], "proxy")
+    """, 'autoproxy <"latch" OR enabled OR proxy> <"global" OR "community" OR "all"> [expires OR "never"]', ["autoproxy latch global", "autoproxy off community", "autoproxy 69ed73 global 3600"], "proxy", ["ap", "auto"])
     async def autoproxy(message: fluxer.Message, setting: str | bool, mode: str, expires: float | str | None):
         if setting in ("latch", "enable", "enabled"):
             setting = True
@@ -170,7 +170,7 @@ def setup(bot: fluxer.Bot):
     @register_command([str], bot, "info", """
     Shows you information about a proxy.
     This proxy has to be owned by you.
-    """, "info <proxy>", ["info 69ed73"], "proxy")
+    """, "info <proxy>", ["info 69ed73"], "proxy", ["i"])
     async def info(message: fluxer.Message, id_: str):
         proxy = await ensure_own_proxy(message, id_)
         if not proxy: return
