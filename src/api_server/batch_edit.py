@@ -38,8 +38,9 @@ async def handle_batch_edit(batch_edit: BatchEdit, owner: int, database: Databas
         if isinstance(proxy_or_group.id, int):
             raise ValueError("Ephemeral ID expected.")
 
-    async def ensure_id_exists(id_: int | EphemeralID, type_: Literal["PROXY"] | Literal["PROXY_GROUP"]):
-        if isinstance(id_, int):
+    async def ensure_id_exists(id_: int | EphemeralID | None, type_: Literal["PROXY"] | Literal["PROXY_GROUP"]):
+        if id_ is None: return
+        elif isinstance(id_, int):
             if type_ == "PROXY":
                 await ensure_proxy(id_)
             else:
