@@ -72,7 +72,7 @@ class EditProxyName(BaseModel):
 
 class EditProxyDescription(BaseModel):
     field: Literal["description"]
-    value: str
+    value: str | None
 
 class EditProxyAvatarURL(BaseModel):
     field: Literal["avatar_url"]
@@ -118,11 +118,11 @@ class EditProxyGroupName(BaseModel):
 
 class EditProxyGroupDescription(BaseModel):
     field: Literal["description"]
-    value: str
+    value: str | None
 
 class EditProxyGroupTag(BaseModel):
     field: Literal["tag"]
-    value: str
+    value: str | None
 
 class EditProxyGroupParent(BaseModel):
     field: Literal["parent"]
@@ -150,7 +150,6 @@ class Edit(BaseModel):
 
 class BatchEdit(BaseModel):
     edits: list[Edit]
-    ephemeral_ids: list[int]
 
 class ItemUpdateResponse[T](BaseModel):
     method: Literal["UPDATE"]
