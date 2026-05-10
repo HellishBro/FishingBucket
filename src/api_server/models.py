@@ -9,10 +9,10 @@ class EphemeralID(BaseModel):
 class ProxyGroup(BaseModel):
     id: int | EphemeralID
     name: str
-    description: str
+    description: str | None
     owner: int
     creation_date: float
-    tag: str
+    tag: str | None
     parent: int | EphemeralID | None
 
     @classmethod
@@ -26,7 +26,7 @@ class ProxyGroup(BaseModel):
 class Proxy(BaseModel):
     id: int | EphemeralID
     name: str
-    description: str
+    description: str | None
     avatar_url: str
     triggers: list[str]
     owner: int
