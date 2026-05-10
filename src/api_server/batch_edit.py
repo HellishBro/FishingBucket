@@ -1,3 +1,4 @@
+from collections import namedtuple
 from typing import Literal, Type, Generator
 
 from .models import BatchEdit, ModifiedItemResponse, ModifiedItem, ProxyGroup, Proxy, Edit, DeleteProxyEdit, \
@@ -6,17 +7,9 @@ from .models import BatchEdit, ModifiedItemResponse, ModifiedItem, ProxyGroup, P
 from ..backend.database import Database
 from ..backend import models as source
 
-class ID:
+class ID(namedtuple("ID", "id type")):
     id: int
     type: Literal["PROXY"] | Literal["PROXY_GROUP"]
-
-    def __init__(self, id_: int, type_: Literal["PROXY"] | Literal["PROXY_GROUP"]):
-        self.id = id_
-        self.type = type_
-
-    def __hash__(self):
-        return hash((self.id, self.type))
-
 
 def filter_edit_type[T](edits: list[Edit], cls: Type[T]) -> Generator[T, None, None]:
     return (edit.edit for edit in edits if isinstance(edit.edit, cls))
