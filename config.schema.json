@@ -132,6 +132,37 @@
           "description": "The path (absolute preferred) to the API database file."
         }
       }
+    },
+    "website": {
+      "type": "object",
+      "description": "Configuration for the website.",
+      "properties": {
+        "dashboard": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the dashboard."
+        },
+        "home": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the homepage."
+        },
+        "terms": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the Terms of Service."
+        },
+        "privacy": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the Privacy Policy."
+        },
+        "contact": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the Contact Us page."
+        }
+      }
     }
   },
   "allOf": [
@@ -148,7 +179,8 @@
             "user_token",
             "client_id",
             "bio",
-            "api_server"
+            "api_server",
+            "website"
           ]
         }
       }

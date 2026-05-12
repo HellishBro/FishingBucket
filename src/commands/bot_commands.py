@@ -164,6 +164,31 @@ def setup(bot: fluxer.Bot):
                 "\n".join(f"**{(m := mapping.get(stat, (stat, lambda n: str(n))))[0]}** (`{stat}`): {m[1](all_stats[stat])}" for stat in all_stats)
             ).to_dict()])
 
+    if Config.instance.website:
+        @register_command([], bot, "dashboard", """
+        Opens the link to the online dashboard.
+        """, "dashboard", ["dashboard"], "bot", ["dash"])
+        async def dashboard(message: fluxer.Message):
+            await response.respond(message, f"The link to the dashboard can be accessed [here]({Config.instance.website.dashboard}).")
+
+        @register_command([], bot, "website", """
+        Opens the link to the online website homepage.
+        """, "website", ["website"], "bot", ["site"])
+        async def dashboard(message: fluxer.Message):
+            await response.respond(message, f"Come visit the website for {Config.instance.name} [here]({Config.instance.website.home}).")
+
+        @register_command([], bot, "legal", """
+        Links to the legal pages on our website.
+        Contains Terms of Service and Privacy Policy.
+        """, "legal", ["legal"], "bot", ["terms", "privacy", "tos"])
+        async def dashboard(message: fluxer.Message):
+            await response.respond(message, f"Please view our Terms of Service [here]({Config.instance.website.terms}), and our Privacy Policy [here]({Config.instance.website.privacy}).")
+
+        @register_command([], bot, "contact", """
+        Opens the link to the Contact Us page on the website.
+        """, "contact", ["contact"], "bot", ["contact us"])
+        async def dashboard(message: fluxer.Message):
+            await response.respond(message, f"Contact us [here]({Config.instance.website.contact})!")
 
     '''
     @register_command([], bot, "donate", """
