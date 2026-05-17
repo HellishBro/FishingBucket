@@ -40,7 +40,7 @@ class ProxyGroup:
                 group["description"] or "",
                 owner,
                 time.time(),
-                ("{} " + group["tag"]) if group.get("tag") else "",
+                ("{} " + sanitize(group["tag"])) if group.get("tag") else "",
                 None
             )
         }
@@ -60,6 +60,9 @@ class ProxyGroup:
 valid_url = re.compile("https?://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)")
 def is_valid_url(string: str) -> bool:
     return bool(valid_url.fullmatch(string))
+
+def sanitize(potential_template: str) -> str:
+    return potential_template.replace("{", "\\{").replace("}", "\\}")
 
 @dataclass
 class Proxy:
@@ -88,15 +91,11 @@ class Proxy:
 
         return cls(data[0], data[1], data[2], data[3], data[4].split("\n"), data[5], data[6], data[7], group, data[9], json.loads(data[10] or "{}"), data[11])
 
-    @staticmethod
-    def process_trigger_part(part: str) -> str:
-        return part.replace("{", "\\}").replace("}", "\\}")
-
     @classmethod
     def from_tupper(cls, tupper: dict, owner: int, groups: dict[int, ProxyGroup]) -> Proxy:
         brackets = []
         for i in range(0, len(tupper["brackets"]), 2):
-            brackets.append(cls.process_trigger_part(tupper["brackets"][i]) + "{}" + cls.process_trigger_part(tupper["brackets"][i + 1]))
+            brackets.append(sanitize(tupper["brackets"][i]) + "{}" + sanitize(tupper["brackets"][i + 1]))
 
         nick = tupper.get("nick")
         if tag := tupper.get("tag"):
@@ -127,7 +126,7 @@ class Proxy:
             pluralkit["name"],
             pluralkit["description"] or "",
             pluralkit["avatar_url"] or Proxy.random_avatar(),
-            [cls.process_trigger_part(i["prefix"] or "") + "{}" + cls.process_trigger_part(i["suffix"] or "") for i in pluralkit["proxy_tags"]] or [],
+            [sanitize(i["prefix"] or "") + "{}" + sanitize(i["suffix"] or "") for i in pluralkit["proxy_tags"]] or [],
             owner,
             pluralkit["message_count"],
             datetime.fromisoformat(pluralkit["created"]).timestamp() if pluralkit["created"] else time.time(),
@@ -144,7 +143,7 @@ class Proxy:
             utter.get("name", ""),
             utter.get("description", ""),
             utter.get("avatar_url", "") if is_valid_url(utter.get("avatar_url", "")) else Proxy.random_avatar(),
-            [cls.process_trigger_part(i["prefix"] or "") + "{}" + cls.process_trigger_part(i["suffix"] or "") for i in utter["proxy_tags"]] or [],
+            [sanitize(i["prefix"] or "") + "{}" + sanitize(i["suffix"] or "") for i in utter["proxy_tags"]] or [],
             owner,
             0,
             time.time(),
