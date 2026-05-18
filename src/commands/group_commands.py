@@ -3,7 +3,7 @@ import fluxer
 from fluxer.models import RawReactionActionEvent
 
 from .utils import proxy_username, ensure_own_proxy, paged_group_list, ensure_own_group, paged_proxy_list, \
-    valid_template
+    valid_template, get_group_text
 from .. import response
 from ..backend.database import Database
 from ..commands import register_command, register_group
@@ -41,9 +41,26 @@ def setup(bot: fluxer.Bot):
         await paged_group_list(message, await Database.instance.get_user_groups(message.author.id),
                                f"Proxy Groups of {message.author.display_name}", page, detailed)
 
+    @register_command([str], bot, "group", """
+    Shows you information about a proxy group.
+    The proxy group has to be owned by you.
+    """, "group <group>", ["group 2d7"], "group", ["g", "g i"])
+    async def group(message: fluxer.Message, group_id: str):
+        if not (g := await ensure_own_group(message, group_id)): return
+
+        detailed = False
+        if (await get_guild_id_from_channel(bot, message.channel_id)) is None:
+            detailed = True
+
+        embed = fluxer.Embed(
+            f"{g.name}",
+            (await get_group_text([g], await Database.instance.get_user_preferences(message.author.id), detailed))
+        )
+        await response.respond(message, "", [embed])
+
     @register_command([str, optional_type(int)], bot, "group members", """
     Views all members that belonged to a group.
-    """, "group members <group> [page]", ["group members 2d7", "group members 2d7 5"], "group", "g m")
+    """, "group members <group> [page]", ["group members 2d7", "group members 2d7 5"], "group", ["g m"])
     async def group_members(message: fluxer.Message, group_id: str, page: int | None):
         if not (group := await ensure_own_group(message, group_id)): return
         proxies = await Database.instance.get_user_proxies(message.author.id)
@@ -80,7 +97,7 @@ def setup(bot: fluxer.Bot):
     @register_command([str, one_or_more(str)], bot, "group add group", """
     Adds groups to a proxy group.
     This enables nested groups. To remove a group from its group, use `group ungroup group`.
-    """, 'group add group <group> <group(s)>', ["group add group 2d7 2d8 2d9"], "group", ["g a g"])
+    """, 'group add group <target group> <group(s)>', ["group add group 2d7 2d8 2d9"], "group", ["g a g"])
     async def group_add_group(message: fluxer.Message, group_id: str, group_ids: list[str]):
         if not (group := await ensure_own_group(message, group_id)): return
         groups = []

@@ -4,6 +4,7 @@ import fluxer
 from fluxer.models import RawReactionActionEvent
 from textdistance import damerau_levenshtein
 
+from ..backend.config import Config
 from ..interaction import Interaction, Interactions, remove_reaction
 from .. import response
 from ..backend.database import Database, UserPreference
@@ -295,6 +296,10 @@ async def ensure_own_group(message: fluxer.Message, id_: str | int) -> ProxyGrou
 
 async def valid_template(message: fluxer.Message, this: str, trigger: str, top_level_variables: list[str]) -> bool:
     try:
+        if "text" in trigger and "{}" not in trigger:
+            trigger = trigger.replace("text", "{}", 1)
+            await response.respond(message, f"> [!NOTE]\n> {Config.instance.name} uses `{'{}'}` for the placeholder instead of `text`.\n> Your input has been auto-coerced to use `{'{}'}`.")
+
         template = Template.from_string(trigger)
         if template.errors:
             await response.respond(message, f"Warning: template reading encountered errors while parsing:\n{'\n'.join(('- ' + err) for err in template.errors)}")
