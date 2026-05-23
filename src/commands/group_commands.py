@@ -45,7 +45,7 @@ def setup(bot: fluxer.Bot):
     Shows you information about a proxy group.
     The proxy group has to be owned by you.
     """, "group <group>", ["group 2d7"], "group", ["g", "g i"])
-    async def group(message: fluxer.Message, group_id: str):
+    async def group_info(message: fluxer.Message, group_id: str):
         if not (g := await ensure_own_group(message, group_id)): return
 
         detailed = False
