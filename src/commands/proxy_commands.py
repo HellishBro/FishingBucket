@@ -112,7 +112,7 @@ def setup(bot: fluxer.Bot):
         channel_id = message.channel_id
         if message.referenced_message:
             message_id = message.referenced_message.id
-            proxy_id = await Database.instance.get_proxy_id(message_id, channel_id)
+            proxy_id = (await Database.instance.get_message_link(message_id, channel_id)).proxy_id
             old_proxy = await ensure_own_proxy(message, proxy_id)
             if not old_proxy: return
         else:
@@ -123,14 +123,14 @@ def setup(bot: fluxer.Bot):
                     await response.delete_message(m)
                     await message.delete()
                 return
-            proxy_id = await Database.instance.get_proxy_id(message_id, channel_id)
+            proxy_id = (await Database.instance.get_message_link(message_id, channel_id)).proxy_id
             old_proxy = await Database.instance.get_proxy(proxy_id)
 
         new_proxy = await ensure_own_proxy(message, new_id)
         if not new_proxy: return
         parent = await bot.fetch_message(str(channel_id), str(message_id))
         await message.delete()
-        await proxy_reproxy(parent, bot, old_proxy, new_proxy)
+        await proxy_reproxy(parent, bot, old_proxy, new_proxy, message.author.id, Platform.Fluxer)
 
     @register_command([alternative(bool, str), alternative("global", "community"), optional_type(alternative(float, "never"))], bot, "autoproxy", """
     Automatically proxies your messages.
@@ -216,10 +216,10 @@ def setup(bot: fluxer.Bot):
     """, "delete", ["delete"], "proxy")
     async def delete(message: fluxer.Message):
         if not (parent := await require_reply(message)): return
-        proxy_id = await Database.instance.get_proxy_id(parent.id, parent.channel_id)
+        proxy_id = (await Database.instance.get_message_link(parent.id, parent.channel_id)).proxy_id
         if proxy_id:
             proxy = await Database.instance.get_proxy(proxy_id)
-            if proxy.owner == message.author.id:
+            if proxy.owner == await get_uid(message):
                 await Database.instance.delete_link_message(parent.id, parent.channel_id)
                 await parent.delete()
                 await message.delete()
@@ -241,7 +241,7 @@ def setup(bot: fluxer.Bot):
     """, "edit <message>", ["edit We grew apart..."], "proxy")
     async def edit(message: fluxer.Message, new: str):
         if not (parent := await require_reply(message)): return
-        proxy_id = await Database.instance.get_proxy_id(parent.id, parent.channel_id)
+        proxy_id = (await Database.instance.get_message_link(parent.id, parent.channel_id)).proxy_id
         if proxy_id:
             proxy = await Database.instance.get_proxy(proxy_id)
             if proxy.owner == await get_uid(message):

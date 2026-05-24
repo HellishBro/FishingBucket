@@ -41,6 +41,11 @@ class Platform(Enum):
         else:
             return 1
 
+    @classmethod
+    def from_(cls, id_: int) -> Platform:
+        return [Platform.Fluxer, Platform.Discord][id_]
+
+
 class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list private_forms dice_functions")):
     private_description: bool
     private_trigger: bool
@@ -54,6 +59,11 @@ class GuildPreference(namedtuple("GuildPreference", "disallow_by_default logging
     disallow_by_default: bool
     logging_channel: int
     dice_functions: bytes
+
+class MessageLink(namedtuple("MessageLink", "proxy_id platform_user platform")):
+    proxy_id: int
+    platform_user: int
+    platform: Platform
 
 @dataclass # it's better if this is mutable for caching
 class UserAutoproxyPreference:
@@ -81,7 +91,7 @@ class Cache:
     user_preferences = TTLCache[tuple[int], UserPreference](MID, LONG)
     autoproxy_preferences = TTLCache[tuple[int, int], UserAutoproxyPreference | None](MID, LONG)
     latest_proxy_message_from_user = TTLCache[tuple[int, int], int](BIG, SHORT)
-    proxy_id_from_message = TTLCache[tuple[int, int], int](MID, MEDIUM)
+    message_link = TTLCache[tuple[int, int], MessageLink](MID, MEDIUM)
     guild_preferences = TTLCache(SMALL, MEDIUM)
     guild_allows = TTLCache(SMALL, LONG)
     guild_role_allows = TTLCache[int, tuple[tuple[int, bool | None]]](MID, LONG)
@@ -168,7 +178,9 @@ class Database:
         CREATE TABLE IF NOT EXISTS message_links (
             message_id INTEGER,
             channel_id INTEGER,
-            proxy_id INTEGER
+            proxy_id INTEGER,
+            platform_user INTEGER,
+            platform_type INTEGER
         );
         """)
         await self.connection.execute("""
@@ -403,6 +415,32 @@ class Database:
                 await self.connection.commit()
             version += 1
 
+        if version == 6:
+            try:
+                await self.connection.execute("""
+                ALTER TABLE message_links ADD COLUMN platform_user INTEGER
+                """)
+                await self.connection.execute("""
+                ALTER TABLE message_links ADD COLUMN platform_type INTEGER
+                """)
+                await self.connection.execute("""
+                UPDATE message_links SET platform_user = (
+                    SELECT a.user_id
+                    FROM accounts a
+                    INNER JOIN proxies p ON p.owner = a.owner
+                    WHERE p.id = message_links.proxy_id
+                    LIMIT 1
+                )
+                """)
+                await self.connection.execute("""
+                UPDATE message_links SET platform_type = ?
+                """, (Platform.Fluxer.get(), ))
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
         await self.set_global_data("version", str(version), version)
 
     @Cache.user_id.cache_async()
@@ -545,17 +583,17 @@ class Database:
             message_id, = res
             return message_id
 
-    async def link_message(self, message_id: int, channel_id: int, proxy_id: int):
+    async def link_message(self, message_id: int, channel_id: int, proxy_id: int, platform_user: int, platform: Platform):
         await self.connection.execute(
-            "INSERT INTO message_links (message_id, channel_id, proxy_id) VALUES (?, ?, ?)",
-            (message_id, channel_id, proxy_id)
+            "INSERT INTO message_links (message_id, channel_id, proxy_id, platform_user, platform_type) VALUES (?, ?, ?, ?, ?)",
+            (message_id, channel_id, proxy_id, platform_user, platform.get())
         )
         await self.connection.commit()
 
     async def delete_link_message(self, message_id: int, channel_id: int):
-        prox_id = await self.get_proxy_id(message_id, channel_id)
-        if prox_id:
-            proxy = await self.get_proxy(prox_id)
+        lnk = await self.get_message_link(message_id, channel_id)
+        if lnk:
+            proxy = await self.get_proxy(lnk.proxy_id)
             owner = proxy.owner
             Cache.latest_proxy_message_from_user.invalidate((channel_id, owner))
         await self.connection.execute(
@@ -564,15 +602,16 @@ class Database:
         )
         await self.connection.commit()
 
-    @Cache.proxy_id_from_message.cache_async()
-    async def get_proxy_id(self, message_id: int, channel_id: int) -> int | None:
+    @Cache.message_link.cache_async()
+    async def get_message_link(self, message_id: int, channel_id: int) -> MessageLink | None:
         async with self.connection.execute(
-            "SELECT proxy_id FROM message_links WHERE message_id = ? AND channel_id = ?",
+            "SELECT proxy_id, platform_user, platform_type FROM message_links WHERE message_id = ? AND channel_id = ?",
             (message_id, channel_id)
         ) as cursor:
             res = await cursor.fetchone()
             if not res: return None
-            return res[0]
+            proxy_id, platform_user, platform_type = res
+            return MessageLink(proxy_id, platform_user, Platform.from_(platform_type))
 
     async def override_permission(self, id_: int, guild_id: int, allow_proxy: str, id_type: int):
         allow_proxy_enum = {"allow": 1, "disallow": -1, "default": 0}[allow_proxy]
