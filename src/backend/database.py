@@ -173,11 +173,19 @@ class Database:
         );
         """)
         await self.connection.execute("""
-        CREATE TABLE IF NOT EXISTS alt_accounts (
-            alt_id INTEGER PRIMARY KEY,
-            owner INTEGER
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT
         );
         """)
+        await self.connection.execute("""
+        CREATE TABLE IF NOT EXISTS accounts (
+            user_id INTEGER,
+            account_type INTEGER,
+            owner INTEGER NOT NULL,
+            PRIMARY KEY (user_id, account_type),
+            FOREIGN KEY (owner) REFERENCES users(user_id)
+        );
+        """) # 0 - fluxer; 1 - discord
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS autoproxies (
             guild_id INTEGER,
@@ -196,6 +204,7 @@ class Database:
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_permission_overrides_id ON permission_overrides (id);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_guild_id ON autoproxies (guild_id);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_user_id ON autoproxies (user_id);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_accounts_query ON accounts (user_id, account_type);")
         await self.connection.execute("PRAGMA journal_mode=WAL;")
         await self.connection.execute("PRAGMA synchronous=NORMAL;")
         await self.connection.execute("PRAGMA cache_size=-64000;") # 64MB cache
@@ -321,6 +330,61 @@ class Database:
                 """)
                 await self.connection.execute("""
                 ALTER TABLE permission_overrides_new RENAME TO permission_overrides;
+                """)
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
+        if version == 5:
+            try:
+                user_ids: dict[int, int] = {}
+                async with self.connection.execute("SELECT id, owner FROM proxies") as cursor:
+                    async for (proxy_id, full_user_id) in cursor:
+                        if full_user_id not in user_ids:
+                            async with self.connection.execute("INSERT INTO users DEFAULT VALUES") as c:
+                                user_ids[full_user_id] = c.lastrowid
+
+                            await self.connection.execute(
+                                "INSERT INTO accounts (user_id, account_type, owner) VALUES (?, ?, ?)",
+                                (full_user_id, 0, user_ids[full_user_id])
+                            )
+
+                        await self.connection.execute(
+                            "UPDATE proxies SET owner = ? WHERE id = ?",
+                            (user_ids[full_user_id], proxy_id)
+                        )
+
+                async with self.connection.execute("SELECT id, owner FROM proxy_groups") as cursor:
+                    async for (group_id, full_user_id) in cursor:
+                        if full_user_id not in user_ids:
+                            async with self.connection.execute("INSERT INTO users DEFAULT VALUES") as c:
+                                user_ids[full_user_id] = c.lastrowid
+
+                            await self.connection.execute(
+                                "INSERT INTO accounts (user_id, account_type, owner) VALUES (?, ?, ?)",
+                                (full_user_id, 0, user_ids[full_user_id])
+                            )
+
+                        await self.connection.execute(
+                            "UPDATE proxy_groups SET owner = ? WHERE id = ?",
+                            (user_ids[full_user_id], group_id)
+                        )
+
+                await self.connection.execute("""
+                INSERT INTO accounts (
+                    user_id,
+                    account_type,
+                    owner,
+                ) SELECT
+                    alt_id,
+                    0,
+                    owner,
+                FROM alt_accounts;
+                """)
+                await self.connection.execute("""
+                DROP TABLE alt_accounts;
                 """)
             except:
                 pass
