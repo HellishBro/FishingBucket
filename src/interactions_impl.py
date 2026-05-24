@@ -6,7 +6,7 @@ from fluxer.models import RawReactionActionEvent
 
 from .interaction import Interactions, message_reactions, remove_reaction
 from .commands import command_list
-from .backend.database import Database
+from .backend.database import Database, Platform
 from .send_proxy import on_user_message, recover_original_message, edit_proxy_message
 from .backend.config import Config
 from .backend.utils import mention_message
@@ -103,27 +103,27 @@ def setup(bot: fluxer.Bot):
         if await Interactions.instance.interact(event.message_id, event.user_id, (event, )):
             return
 
+        usr = await bot.fetch_user(str(event.user_id))
+        uid = await Database.instance.get_user_id(usr.id, Platform.Fluxer)
+
         if event.emoji.name == "❓":
             msg = await bot.fetch_message(str(event.channel_id), str(event.message_id))
-            usr = await bot.fetch_user(str(event.user_id))
             if embed := await show_proxy_info(bot, msg):
                 await usr.send("", embeds=[embed])
                 await remove_reaction(msg, event.emoji.name, usr)
         if event.emoji.name == "❌":
-            usr = await bot.fetch_user(str(event.user_id))
             proxy_id = await Database.instance.get_proxy_id(event.message_id, event.channel_id)
             if proxy_id:
                 proxy = await Database.instance.get_proxy(proxy_id)
-                if proxy.owner == usr.id:
+                if proxy.owner == uid:
                     await Database.instance.delete_link_message(event.message_id, event.channel_id)
                     message_reactions.pop((event.message_id, event.user_id))
                     await bot.delete_message(event.channel_id, event.message_id)
         if event.emoji.name == "📝":
-            usr = await bot.fetch_user(str(event.user_id))
             proxy_id = await Database.instance.get_proxy_id(event.message_id, event.channel_id)
             if proxy_id:
                 proxy = await Database.instance.get_proxy(proxy_id)
-                if proxy.owner == usr.id:
+                if proxy.owner == uid:
                     msg = await bot.fetch_message(str(event.channel_id), str(event.message_id))
                     await remove_reaction(msg, event.emoji.name, usr)
                     await usr.send(f"Editing message:\n```\n{recover_original_message(msg)[1]}\n```")
