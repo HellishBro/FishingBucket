@@ -1080,12 +1080,12 @@ class Database:
             pass
 
         async with self.connection.execute("""
-        DELETE FROM users WHERE user_id = ?
+        DELETE FROM accounts WHERE owner = ?
         """, (user, )):
             pass
 
         async with self.connection.execute("""
-        DELETE FROM accounts WHERE owner = ?
+        DELETE FROM users WHERE user_id = ?
         """, (user, )):
             pass
 
