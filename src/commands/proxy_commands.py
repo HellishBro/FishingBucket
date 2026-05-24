@@ -3,9 +3,9 @@ import fluxer
 from textdistance import damerau_levenshtein
 
 from .utils import proxy_username, paged_proxy_list, ensure_own_proxy, get_proxies_text, require_reply, valid_template, \
-    example_trigger_text
+    example_trigger_text, get_uid
 from .. import response
-from ..backend.database import Database
+from ..backend.database import Database, Platform
 from ..commands import register_command, register_group
 from ..interaction import Interactions
 from ..interactions_impl import show_proxy_info
@@ -32,7 +32,7 @@ def setup(bot: fluxer.Bot):
         else:
             avatar_url = message.attachments[0].url
 
-        new_proxy = await Database.instance.put_proxy(Proxy(None, name, "", avatar_url, [trigger], int(message.author.id), 0, time.time(), None, "", {}, None))
+        new_proxy = await Database.instance.put_proxy(Proxy(None, name, "", avatar_url, [trigger], await get_uid(message), 0, time.time(), None, "", {}, None))
         hex_id = str(hex(new_proxy.id))[2:].lower()
         embed = fluxer.Embed(
             f"{name} (`{hex_id}`)",
@@ -48,9 +48,9 @@ def setup(bot: fluxer.Bot):
     If `page` is provided, it will display the proxies on that page number. Defaults to 1.
     """, "list [user] [page]", ["list", "list 4", "list @Gordon", "list @Phil 43"], "proxy", ["l"])
     async def list_(message: fluxer.Message, user: fluxer.User | None, page: int | None):
-        uid = user.id if user else message.author.id
+        uid = await Database.instance.get_user_id(user.id if user else message.author.id)
         name = user.display_name if user else message.author.display_name
-        if (await Database.instance.get_user_preferences(uid)).private_list and uid != message.author.id:
+        if (await Database.instance.get_user_preferences(uid)).private_list and user and user.id != message.author.id:
             await response.respond(message, "That user have a private proxy list!")
             return
 
@@ -79,9 +79,14 @@ def setup(bot: fluxer.Bot):
 
         name = normalize_emojis(name)
 
-        proxies = await Database.instance.get_user_proxies(message.author.id)
+        proxies = await Database.instance.get_user_proxies(await get_uid(message))
         proxies = [proxy for proxy in proxies if (name.lower() in proxy.name.lower()) or (name.lower() in (proxy.nickname or "").lower())]
-        distances = {i: min(damerau_levenshtein(name.lower(), valid_proxy.name.lower()), damerau_levenshtein(name.lower(), (valid_proxy.nickname or valid_proxy.name).lower())) for i, valid_proxy in enumerate(proxies)}
+        distances = {
+            i: min(
+                damerau_levenshtein(name.lower(), valid_proxy.name.lower()),
+                damerau_levenshtein(name.lower(), (valid_proxy.nickname or valid_proxy.name).lower())
+            ) for i, valid_proxy in enumerate(proxies)
+        }
         distances = {k: v for k, v in distances.items() if v <= 5}
         sorted_distances = dict(sorted(distances.items(), key=lambda kv: kv[1]))
         sorted_indices = sorted_distances.keys()

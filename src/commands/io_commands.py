@@ -6,6 +6,7 @@ from io import BytesIO
 
 import fluxer
 
+from .utils import get_uid
 from .. import response
 from ..backend.database import Database
 from ..commands import register_command, register_group
@@ -41,11 +42,13 @@ def setup(bot: fluxer.Bot):
             title = url.split("?")[0].split("/")[-1]
             contents = await read_file(url)
 
+        owner = await get_uid(message)
+
         if "tuppers" in title and title.endswith(".json"):
             m = await response.respond(message, "Loading from Tupperbox!")
             try:
                 res = json.loads(contents)
-                groups, proxies = import_tupperbox(res, int(message.author.id))
+                groups, proxies = import_tupperbox(res, owner)
             except Exception as e:
                 print(f"{e} when loading from Tupperbox: {contents}")
                 await response.respond(message, "Error! Cannot load from Tupperbox! Is the uploaded file corrupted?")
@@ -56,7 +59,7 @@ def setup(bot: fluxer.Bot):
             m = await response.respond(message, "Loading from Fishing Bucket!")
             try:
                 res = json.loads(gzip.decompress(base64.a85decode(contents.encode("utf-8"))).decode("utf-8"))
-                groups, proxies = import_native(res, int(message.author.id))
+                groups, proxies = import_native(res, owner)
             except Exception as e:
                 print(f"{e} when loading from Fishing Bucket: {contents}")
                 await response.respond(message, f"Error! Cannot load from Fishing Bucket! Is the uploaded file corrupted?")
@@ -67,7 +70,7 @@ def setup(bot: fluxer.Bot):
             m = await response.respond(message, "Loading from Utter!")
             try:
                 res = json.loads(contents)
-                groups, proxies = import_utter(res, int(message.author.id))
+                groups, proxies = import_utter(res, owner)
             except Exception as e:
                 print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
                 await response.respond(message, f"Error! Cannot load from Utter! Is the uploaded file corrupted?")
@@ -78,7 +81,7 @@ def setup(bot: fluxer.Bot):
             m = await response.respond(message, "Loading from Pluralkit!")
             try:
                 res = json.loads(contents)
-                groups, proxies = import_pluralkit(res, int(message.author.id))
+                groups, proxies = import_pluralkit(res, owner)
             except Exception as e:
                 print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
                 # print(f"{e} when loading from Pluralkit: {contents}")
@@ -92,8 +95,8 @@ def setup(bot: fluxer.Bot):
             await message.delete()
             return
 
-        user_proxies = await Database.instance.get_user_proxies(message.author.id)
-        user_groups = await Database.instance.get_user_groups(message.author.id)
+        user_proxies = await Database.instance.get_user_proxies(owner)
+        user_groups = await Database.instance.get_user_groups(owner)
 
         updated_proxies = 0
         updated_groups = 0
@@ -142,8 +145,9 @@ def setup(bot: fluxer.Bot):
     This includes everything to import the proxy back into the bot.
     """, "export", ["export"], "io")
     async def export(message: fluxer.Message):
-        groups = await Database.instance.get_user_groups(int(message.author.id))
-        proxies = await Database.instance.get_user_proxies(int(message.author.id))
+        owner = await get_uid(message)
+        groups = await Database.instance.get_user_groups(owner)
+        proxies = await Database.instance.get_user_proxies(owner)
         jsoned = json.dumps(export_native(groups, proxies))
         contents = base64.a85encode(gzip.compress(jsoned.encode("utf-8"))).decode("utf-8")
         file = fluxer.File(

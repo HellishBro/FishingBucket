@@ -3,7 +3,7 @@ from fluxer.models import RawReactionActionEvent
 
 from . import register_group, register_command
 from .. import response
-from ..backend.database import Database
+from ..backend.database import Database, Platform
 from ..backend.models import alternative, one_or_more
 from ..interaction import Interactions, Interaction, remove_reaction
 
@@ -35,7 +35,7 @@ def setup(bot: fluxer.Bot):
 
         async def cb(event: RawReactionActionEvent):
             if event.emoji.name == "✅":
-                await Database.instance.link_accounts(await Database.instance.get_user_id(message.author.id), user.id)
+                await Database.instance.link_accounts(await Database.instance.get_user_id(message.author.id), user.id, Platform.Fluxer)
                 await response.respond(message, f"Successfully linked <@{user.id}> with your account!")
 
         Interactions.instance.add_interaction(m.id, Interaction(user.id, cb, 60))
@@ -53,7 +53,7 @@ def setup(bot: fluxer.Bot):
         if parent == message.author.id:
             await response.respond(message, "This account does not have a parent account!")
         else:
-            await Database.instance.unlink_account(message.author.id)
+            await Database.instance.unlink_account(message.author.id, Platform.Fluxer)
             await response.respond(message, f"Successfully unlinked this account with <@{parent}>!")
 
     @register_command(
