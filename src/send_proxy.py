@@ -7,7 +7,7 @@ import re
 
 from .backend.cache import TTLCache
 from .backend.config import Config
-from .backend.database import Database, GuildPreference, UserAutoproxyPreference, Platform
+from .backend.database import Database, GuildPreference, UserAutoproxyPreference, Platform, Guild
 from .backend.models import Proxy
 from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
@@ -94,7 +94,7 @@ async def send_proxy_message(proxy: Proxy, message: str, parent_message: fluxer.
 
         message = f"-# ↩ {mention}\n" + message
 
-    message, embeds = await modify_message(proxy.owner, await Database.instance.get_guild_preferences(channel.guild_id), message, [])
+    message, embeds = await modify_message(proxy.owner, await Database.instance.get_guild_preferences(Guild(channel.guild_id, Platform.Fluxer)), message, [])
     return await send_webhook(
         webhook, message,
         embeds=embeds, username=proxy.effective_name, avatar_url=proxy.effective_avatar,
@@ -148,7 +148,7 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
     embeds = old_message.embeds
     parent_message = old_message.referenced_message
     webhook = await get_webhook(old_message.channel_id, bot)
-    server_preferences = await Database.instance.get_guild_preferences((await bot.fetch_channel(str(old_message.channel_id))).guild_id)
+    server_preferences = await Database.instance.get_guild_preferences(Guild((await bot.fetch_channel(str(old_message.channel_id))).guild_id, Platform.Fluxer))
     await old_message.delete()
     await Database.instance.delete_link_message(old_message.id, old_message.channel_id)
     contents, embeds = await modify_message(new_proxy.owner, server_preferences, contents, embeds)
@@ -159,7 +159,7 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
         mention=bool(old_message.mentions)
     )
     await Database.instance.transfer_proxy_usage(old_proxy.id, new_proxy.id)
-    await Database.instance.set_autoproxy_last_used_proxy(old_proxy.owner, await get_guild_id_from_channel(bot, old_message.channel_id), new_proxy.id)
+    await Database.instance.set_autoproxy_last_used_proxy(old_proxy.owner, Guild(await get_guild_id_from_channel(bot, old_message.channel_id), Platform.Fluxer), new_proxy.id)
     await Database.instance.link_message(m.id, m.channel_id, new_proxy.id, platform_user, platform)
     logging_channel_id = server_preferences.logging_channel
     if logging_channel_id != 0:
@@ -186,7 +186,7 @@ async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_m
     webhook = await get_webhook(old_message.channel_id, bot)
     lnk = await Database.instance.get_message_link(old_message.id, old_message.channel_id)
     proxy = await Database.instance.get_proxy(lnk.proxy_id)
-    server_preferences = await Database.instance.get_guild_preferences((await bot.fetch_channel(str(old_message.channel_id))).guild_id)
+    server_preferences = await Database.instance.get_guild_preferences(Guild((await bot.fetch_channel(str(old_message.channel_id))).guild_id, Platform.Fluxer))
     pre, old_msg = recover_original_message(old_message)
     contents, embeds = await modify_message(proxy.owner, server_preferences, new_message_contents, embeds)
     old_msg = old_message.content
@@ -218,12 +218,13 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
 
     if await Database.instance.get_allow_proxy(
             int(message.channel_id),
-            int(message.guild_id),
+            Guild(message.guild_id, Platform.Fluxer),
             (await get_member(bot, await get_guild_id_from_channel(bot, message.channel_id), message.author.id)).roles[::-1],
             message.author.id
     ):
         guild_id = await get_guild_id_from_channel(bot, message.channel_id)
-        autoproxy_prefs = await Database.instance.get_autoproxy_preference(owner, guild_id)
+        autoproxy_prefs = await Database.instance.get_autoproxy_preference(owner, Guild(guild_id, Platform.Fluxer))
+        print(autoproxy_prefs)
         proxied = await get_proxied_messages(message.content, owner, autoproxy_prefs)
         if proxied:
             parent = None
@@ -249,7 +250,7 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
                         await Database.instance.link_message(msg.id, msg.channel_id, proxy.id, message.author.id, Platform.Fluxer)
 
                     if logging_channel is None:
-                        server_preferences = await Database.instance.get_guild_preferences(int(message.guild_id))
+                        server_preferences = await Database.instance.get_guild_preferences(Guild(message.guild_id, Platform.Fluxer))
                         logging_channel_id = server_preferences[1]
                         if logging_channel_id != 0:
                             logging_channel = await bot.fetch_channel(str(logging_channel_id))
@@ -278,6 +279,6 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
                 await Database.instance.use_proxy(proxy.id)
 
             if proxy:
-                await Database.instance.set_autoproxy_last_used_proxy(message.author.id, guild_id, proxy.id)
+                await Database.instance.set_autoproxy_last_used_proxy(owner, Guild(guild_id, Platform.Fluxer), proxy.id)
 
             await delete_message(message)
