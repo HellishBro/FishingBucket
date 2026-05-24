@@ -4,6 +4,7 @@ import aiosqlite as sql
 import time
 from collections import namedtuple
 from dataclasses import dataclass
+from enum import Enum, auto
 
 from .cache import TTLCache
 from .models import Proxy, ProxyGroup
@@ -29,6 +30,16 @@ def upsert_query(table: str, key: str, key_check: Any, names: dict[str, tuple[An
     )
     params = (key_check, ) + tuple(defaults) + tuple(values) + (key_check, )
     return sql_str, params
+
+class Platform(Enum):
+    Fluxer = auto()
+    Discord = auto()
+
+    def get(self) -> int:
+        if self == Platform.Fluxer:
+            return 0
+        else:
+            return 1
 
 class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list private_forms dice_functions")):
     private_description: bool
@@ -66,7 +77,7 @@ class Cache:
     proxy_cache = TTLCache[int, Proxy](MASSIVE, LONG)
     group_cache = TTLCache[int, ProxyGroup](MASSIVE, LONG)
 
-    user_id = TTLCache[tuple[int], int](MID, LONG)
+    user_id = TTLCache[tuple[int, Platform], int](MID, LONG)
     user_preferences = TTLCache[tuple[int], UserPreference](MID, LONG)
     autoproxy_preferences = TTLCache[tuple[int, int], UserAutoproxyPreference | None](MID, LONG)
     latest_proxy_message_from_user = TTLCache[tuple[int, int], int](BIG, SHORT)
@@ -395,18 +406,36 @@ class Database:
         await self.set_global_data("version", str(version), version)
 
     @Cache.user_id.cache_async()
-    async def get_user_id(self, alt_or_user: int) -> int:
-        async with self.connection.execute("SELECT COALESCE((SELECT owner FROM alt_accounts WHERE alt_id = ?), ?)", (alt_or_user, alt_or_user)) as cursor:
-            return (await cursor.fetchone())[0]
+    async def get_user_id(self, sso: int, platform: Platform = Platform.Fluxer) -> int:
+        async with self.connection.execute(
+                "SELECT owner FROM accounts WHERE user_id = ? AND account_type = ?",
+                (sso, platform.get())
+        ) as cursor:
+            curs = await cursor.fetchone()
 
-    async def link_accounts(self, owner: int, alt: int):
-        await self.connection.execute("INSERT INTO alt_accounts (alt_id, owner) VALUES (?, ?)", (alt, owner))
-        await self.connection.commit()
+        if curs is None:
+            async with self.connection.execute("INSERT INTO users DEFAULT VALUES;") as c:
+                new_user_id = c.lastrowid
+            async with self.connection.execute(
+                    "INSERT INTO accounts (user_id, account_type, owner) VALUES (?, ?, ?)",
+                    (sso, platform.get(), new_user_id)
+            ):
+                return new_user_id
 
-    async def unlink_account(self, alt: int):
-        await self.connection.execute("DELETE FROM alt_accounts WHERE alt_id = ?", (alt, ))
-        await self.connection.commit()
-        Cache.user_id.invalidate((alt, ))
+        return curs[0]
+
+    async def link_accounts(self, user_id: int, sso_id: int, platform: Platform):
+        async with self.connection.execute(
+            "INSERT INTO accounts (user_id, account_type, owner) VALUES (?, ?, ?)",
+            (sso_id, platform.get(), user_id)
+        ): pass
+
+    async def unlink_account(self, sso_id: int, platform: Platform):
+        async with self.connection.execute(
+                "DELETE FROM accounts WHERE user_id = ? AND account_type = ?",
+                (sso_id, platform.get())
+        ):
+            Cache.user_id.invalidate((sso_id, platform))
 
     async def get_autoproxy_preference(self, user_id: int, guild_id: int) -> UserAutoproxyPreference | None:
         if (ref := Cache.autoproxy_preferences.get((user_id, guild_id), 0)) is not 0:
@@ -487,7 +516,6 @@ class Database:
         if not changes:
             return
 
-        user_id = await self.get_user_id(user_id)
         prefs = await self.get_user_preferences(user_id)
         true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, private_forms, dice_functions)
         true_compare_list = tuple((a if a is not None else b for a, b in zip(true_compare_list, prefs)))
@@ -500,7 +528,7 @@ class Database:
     async def get_user_preferences(self, user_id: int) -> UserPreference:
         async with self.connection.execute(
                 "SELECT * FROM user_settings WHERE user_id = ?",
-                (await self.get_user_id(user_id), )
+                (user_id, )
         ) as cursor:
             res = await cursor.fetchone()
             if not res: return UserPreference(False, False, False, False, False, False, b"")
@@ -931,8 +959,6 @@ class Database:
         return res[0]
 
     async def get_user_proxies(self, user: int) -> list[Proxy]:
-        user = await self.get_user_id(user)
-
         if ids := Cache.proxies_from_user.get(user):
             prox = []
             for id_ in ids:
@@ -948,8 +974,6 @@ class Database:
             return proxies
 
     async def get_user_groups(self, user: int) -> list[ProxyGroup]:
-        user = await self.get_user_id(user)
-
         if ids := Cache.groups_from_user.get(user):
             gr = []
             for id_ in ids:
@@ -968,7 +992,6 @@ class Database:
         await self.connection.close()
 
     async def delete_data(self, owner: int):
-        owner = await self.get_user_id(owner)
         cur = await self.connection.execute(
             "SELECT COUNT(*) FROM proxies WHERE owner = ?",
             (owner, )
