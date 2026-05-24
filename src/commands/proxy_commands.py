@@ -48,7 +48,7 @@ def setup(bot: fluxer.Bot):
     If `page` is provided, it will display the proxies on that page number. Defaults to 1.
     """, "list [user] [page]", ["list", "list 4", "list @Gordon", "list @Phil 43"], "proxy", ["l"])
     async def list_(message: fluxer.Message, user: fluxer.User | None, page: int | None):
-        uid = await Database.instance.get_user_id(user.id if user else message.author.id)
+        uid = await Database.instance.get_user_id(user.id if user else message.author.id, Platform.Fluxer)
         name = user.display_name if user else message.author.display_name
         if (await Database.instance.get_user_preferences(uid)).private_list and user and user.id != message.author.id:
             await response.respond(message, "That user have a private proxy list!")

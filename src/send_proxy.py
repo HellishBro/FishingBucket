@@ -1,4 +1,3 @@
-import time
 import traceback
 from typing import Literal
 
@@ -14,6 +13,7 @@ from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
 from .backend.utils import mention_message, convert_attachments, normalize_emojis, roll_dice, edit_webhook, \
     get_guild_id_from_channel, send_webhook
+from .commands.utils import get_uid
 from .response import delete_message
 
 
@@ -167,7 +167,7 @@ async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy
         message_link = await mention_message(bot, m)
         embed = fluxer.Embed(
             f"Message Proxy Change",
-            f"**Previous Proxy**: {old_proxy.effective_name}\n**New Proxy**: {new_proxy.effective_name}\n**Owner**: <@{new_proxy.owner}> (`{new_proxy.owner}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**New Message Link**: [jump]({message_link})"
+            f"**Previous Proxy**: {old_proxy.effective_name}\n**New Proxy**: {new_proxy.effective_name}\n**Owner**: <@{old_message.author.id}> (`{old_message.author.id}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**New Message Link**: [jump]({message_link})"
         )
         embed.set_thumbnail(url=new_proxy.effective_avatar)
         await logging_channel.send("", embeds=[embed])
@@ -198,7 +198,7 @@ async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_m
         message_link = await mention_message(bot, m)
         embed = fluxer.Embed(
             f"Message Edit",
-            f"**Proxy**: {proxy.effective_name}\n**Owner**: <@{proxy.owner}> (`{proxy.owner}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**Message Link**: [jump]({message_link})\n**Old Message**:\n{'\n'.join('> ' + line for line in old_msg.split('\n'))}\n**New Message**:\n{'\n'.join('> ' + line for line in new_message_contents.split('\n'))}"
+            f"**Proxy**: {proxy.effective_name}\n**Owner**: <@{old_message.author.id}> (`{old_message.author.id}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**Message Link**: [jump]({message_link})\n**Old Message**:\n{'\n'.join('> ' + line for line in old_msg.split('\n'))}\n**New Message**:\n{'\n'.join('> ' + line for line in new_message_contents.split('\n'))}"
         )
         embed.set_thumbnail(url=proxy.effective_avatar)
         await logging_channel.send("", embeds=[embed])
@@ -213,6 +213,8 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
     if not message.guild_id:
         return
 
+    owner = await get_uid(message)
+
     if await Database.instance.get_allow_proxy(
             int(message.channel_id),
             int(message.guild_id),
@@ -220,8 +222,8 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
             message.author.id
     ):
         guild_id = await get_guild_id_from_channel(bot, message.channel_id)
-        autoproxy_prefs = await Database.instance.get_autoproxy_preference(message.author.id, guild_id)
-        proxied = await get_proxied_messages(message.content, int(message.author.id), autoproxy_prefs)
+        autoproxy_prefs = await Database.instance.get_autoproxy_preference(owner, guild_id)
+        proxied = await get_proxied_messages(message.content, owner, autoproxy_prefs)
         if proxied:
             parent = None
             if message.referenced_message is not None:
@@ -258,7 +260,7 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
                             reply_msg = f"**Replying To**: [message link]({await mention_message(bot, parent)})\n" if parent else ""
                             embed = fluxer.Embed(
                                 f"Proxied Message",
-                                f"**Proxy**: {proxy.effective_name}\n**Owner**: <@{proxy.owner}> (`{proxy.owner}`)\n**Channel**: <#{message.channel_id}> (`{message.channel_id}`)\n**Message Link**: [jump]({message_link})\n{reply_msg}**Message**:\n{'\n'.join('> ' + line for line in m.split('\n'))}"
+                                f"**Proxy**: {proxy.effective_name}\n**Owner**: <@{message.author.id}> (`{message.author.id}`)\n**Channel**: <#{message.channel_id}> (`{message.channel_id}`)\n**Message Link**: [jump]({message_link})\n{reply_msg}**Message**:\n{'\n'.join('> ' + line for line in m.split('\n'))}"
                             )
                             embed.set_thumbnail(url=proxy.effective_avatar)
                             await logging_channel.send("", embeds=[embed])
