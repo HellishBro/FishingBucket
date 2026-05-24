@@ -2,6 +2,7 @@ import fluxer
 from fluxer.models import RawReactionActionEvent
 
 from . import register_group, register_command
+from .utils import get_uid
 from .. import response
 from ..backend.database import Database, Platform
 from ..backend.models import alternative, one_or_more
@@ -76,7 +77,7 @@ def setup(bot: fluxer.Bot):
         """, 'privacy', ["privacy"], "user"
     )
     async def privacy_list(message: fluxer.Message):
-        preferences = await Database.instance.get_user_preferences(message.author.id)
+        preferences = await Database.instance.get_user_preferences(await get_uid(message))
         pref_dict = {
             "private_description": False,
             "private_trigger": False,
@@ -140,7 +141,7 @@ def setup(bot: fluxer.Bot):
         public = mode == "private"
         kwargs = {m[k]: public for k in options}
 
-        await Database.instance.set_user_preferences(message.author.id, **kwargs)
+        await Database.instance.set_user_preferences(await get_uid(message), **kwargs)
         await response.respond(message, "", [fluxer.Embed(
             "Privacy Set!",
             f"Successfully set the following privacy options to **{mode}**: {", ".join(options)}."
