@@ -22,11 +22,12 @@ def setup(bot: fluxer.Bot):
         if user.bot:
             await response.respond(message, "You cannot link yourself to a bot!")
             return
-        owner = await Database.instance.get_user_id(user.id)
-        if owner == message.author.id:
+        other = await Database.instance.get_user_id(user.id, Platform.Fluxer, False)
+        self = await Database.instance.get_user_id(message.author.id, Platform.Fluxer)
+        if other == self:
             await response.respond(message, "That account is already linked to you!")
             return
-        if owner != user.id:
+        if other != -1:
             await response.respond(message, "That account is already linked to another account!")
             return
 

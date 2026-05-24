@@ -444,7 +444,7 @@ class Database:
         await self.set_global_data("version", str(version), version)
 
     @Cache.user_id.cache_async()
-    async def get_user_id(self, sso: int, platform: Platform = Platform.Fluxer) -> int:
+    async def get_user_id(self, sso: int, platform: Platform = Platform.Fluxer, create: bool = True) -> int:
         async with self.connection.execute(
                 "SELECT owner FROM accounts WHERE user_id = ? AND account_type = ?",
                 (sso, platform.get())
@@ -452,13 +452,15 @@ class Database:
             curs = await cursor.fetchone()
 
         if curs is None:
-            async with self.connection.execute("INSERT INTO users DEFAULT VALUES;") as c:
-                new_user_id = c.lastrowid
-            async with self.connection.execute(
-                    "INSERT INTO accounts (user_id, account_type, owner) VALUES (?, ?, ?)",
-                    (sso, platform.get(), new_user_id)
-            ):
-                return new_user_id
+            if create:
+                async with self.connection.execute("INSERT INTO users DEFAULT VALUES;") as c:
+                    new_user_id = c.lastrowid
+                async with self.connection.execute(
+                        "INSERT INTO accounts (user_id, account_type, owner) VALUES (?, ?, ?)",
+                        (sso, platform.get(), new_user_id)
+                ):
+                    return new_user_id
+            return -1
 
         return curs[0]
 
@@ -466,7 +468,8 @@ class Database:
         async with self.connection.execute(
             "INSERT INTO accounts (user_id, account_type, owner) VALUES (?, ?, ?)",
             (sso_id, platform.get(), user_id)
-        ): pass
+        ):
+            Cache.user_id.invalidate((sso_id, platform))
 
     async def unlink_account(self, sso_id: int, platform: Platform):
         async with self.connection.execute(
