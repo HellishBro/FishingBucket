@@ -1066,3 +1066,32 @@ class Database:
             d[k] = v
         await cursor.close()
         return d
+
+    async def account_reset(self, user: int):
+        # oh dear
+        async with self.connection.execute("""
+        DELETE FROM message_links WHERE proxy_id IN (SELECT id FROM proxies WHERE owner = ?)
+        """, (user, )):
+            pass
+
+        async with self.connection.execute("""
+        DELETE FROM user_settings WHERE user_id = ?
+        """, (user, )):
+            pass
+
+        async with self.connection.execute("""
+        DELETE FROM users WHERE user_id = ?
+        """, (user, )):
+            pass
+
+        async with self.connection.execute("""
+        DELETE FROM accounts WHERE owner = ?
+        """, (user, )):
+            pass
+
+        async with self.connection.execute("""
+        DELETE FROM autoproxies WHERE user_id = ?
+        """, (user, )):
+            pass
+
+        await self.delete_data(user)

@@ -23,12 +23,15 @@ def setup(bot: fluxer.Bot):
             await response.respond(message, "You cannot link yourself to a bot!")
             return
         other = await Database.instance.get_user_id(user.id, Platform.Fluxer, False)
-        self = await Database.instance.get_user_id(message.author.id, Platform.Fluxer)
-        if other == self:
+        self = await Database.instance.get_user_id(message.author.id, Platform.Fluxer, False)
+        if other == self and other != -1:
             await response.respond(message, "That account is already linked to you!")
             return
         if other != -1:
-            await response.respond(message, "That account is already linked to another account!")
+            await response.respond(message, "That account cannot be linked to you!")
+            return
+        if self == -1:
+            await response.respond(message, "You do not have an account yet!")
             return
 
         m = await response.respond(message, "React to this message from the other account to link accounts!")
@@ -142,3 +145,43 @@ def setup(bot: fluxer.Bot):
             "Privacy Set!",
             f"Successfully set the following privacy options to **{mode}**: {", ".join(options)}."
         )])
+
+    @register_command([], bot, "account reset", """
+    Deletes every information related to your account.
+    > [!CAUTION]
+    > This action is **irreversible**!
+    
+    Your account will cease to exist, and every proxy, proxy group, user settings, connected accounts, and others will cease to exist with it!
+    """, "account reset", ["account reset"], "user")
+    async def account_reset(message: fluxer.Message):
+        owner = await Database.instance.get_user_id(message.author.id, Platform.Fluxer, False)
+        if owner == -1:
+            await response.respond(message, "You don't have an account!")
+            return
+
+        m = await response.respond(message,
+                                   f"> [!CAUTION]\n> Are you sure you want to **delete everything**? React to the :white_check_mark: to confirm. This message will expire in 10 seconds.")
+        await m.add_reaction("✅")
+        msg_id = int(m.id)
+
+        async def cb(event: RawReactionActionEvent):
+            if event.emoji.name == "✅":
+                m_ = await response.respond(m, "> [!CAUTION]\n> Are you really **sure**? This action cannot be undone. React to the :white_check_mark: to conform. This message will expire in 10 seconds.")
+                await m_.add_reaction("✅")
+
+                Interactions.instance.add_interaction(m_.id, Interaction(message.author.id, cb_2, 10))
+
+                if await Interactions.instance.wait_claim_after(10, m_.id, message.author.id):
+                    await m_.edit("Account reset confirmation expired!")
+                    await remove_reaction(m_, "✅")
+
+        async def cb_2(event: RawReactionActionEvent):
+            if event.emoji.name == "✅":
+                await Database.instance.account_reset(owner)
+                await response.respond(message, f"Successfully deleted your account!")
+
+        Interactions.instance.add_interaction(msg_id, Interaction(message.author.id, cb, 10))
+
+        if await Interactions.instance.wait_claim_after(10, msg_id, message.author.id):
+            await m.edit("Account reset confirmation expired!")
+            await remove_reaction(m, "✅")
