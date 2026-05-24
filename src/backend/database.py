@@ -376,11 +376,11 @@ class Database:
                 INSERT INTO accounts (
                     user_id,
                     account_type,
-                    owner,
+                    owner
                 ) SELECT
                     alt_id,
                     0,
-                    owner,
+                    owner
                 FROM alt_accounts;
                 """)
                 await self.connection.execute("""
