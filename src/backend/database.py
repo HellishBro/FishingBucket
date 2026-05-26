@@ -174,11 +174,12 @@ class Database:
         """) # 0 - channel; 1 - role; 2 - user
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS guild_preferences (
-            guild_id INTEGER PRIMARY KEY,
+            guild_id INTEGER,
             disallow_by_default BOOLEAN,
             logging_channel INTEGER,
             dice_functions BLOB,
-            guild_type INTEGER
+            guild_type INTEGER,
+            PRIMARY KEY (guild_id, guild_type)
         );
         """)
         await self.connection.execute("""
@@ -224,7 +225,7 @@ class Database:
             last_used_proxy INTEGER,
             expires REAL,
             guild_type INTEGER,
-            PRIMARY KEY (guild_id, user_id)
+            PRIMARY KEY (guild_id, user_id, guild_type)
         );
         """)
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_proxies_owner ON proxies (owner);")
@@ -479,6 +480,110 @@ class Database:
             try:
                 await self.connection.execute("""
                 UPDATE autoproxies SET user_id = (SELECT owner FROM accounts WHERE accounts.user_id = autoproxies.user_id AND account_type = 0)
+                """)
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
+        if version == 9:
+            try:
+                await self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS guild_preferences_new (
+                    guild_id INTEGER,
+                    disallow_by_default BOOLEAN,
+                    logging_channel INTEGER,
+                    dice_functions BLOB,
+                    guild_type INTEGER,
+                    PRIMARY KEY (guild_id, guild_type)
+                );
+                """)
+                await self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS autoproxies_new (
+                    guild_id INTEGER,
+                    user_id INTEGER,
+                    proxy INTEGER,
+                    last_used_proxy INTEGER,
+                    expires REAL,
+                    guild_type INTEGER,
+                    PRIMARY KEY (guild_id, user_id, guild_type)
+                );
+                """)
+                await self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS permission_overrides_new (
+                    id INTEGER,
+                    guild_id INTEGER,
+                    allow_proxy INTEGER,
+                    id_type INTEGER,
+                    guild_type INTEGER,
+                    PRIMARY KEY (id, guild_id, guild_type)
+                );
+                """)
+                await self.connection.execute("""
+                INSERT INTO guild_preferences_new (
+                    guild_id,
+                    disallow_by_default,
+                    logging_channel,
+                    dice_functions,
+                    guild_type
+                ) SELECT
+                    guild_id,
+                    disallow_by_default,
+                    logging_channel,
+                    dice_functions,
+                    guild_type
+                FROM guild_preferences;
+                """)
+                await self.connection.execute("""
+                INSERT INTO autoproxies_new (
+                    guild_id,
+                    user_id,
+                    proxy,
+                    last_used_proxy,
+                    expires,
+                    guild_type
+                ) SELECT
+                    guild_id,
+                    user_id,
+                    proxy,
+                    last_used_proxy,
+                    expires,
+                    guild_type
+                FROM autoproxies;
+                """)
+                await self.connection.execute("""
+                INSERT INTO permission_overrides_new (
+                    id,
+                    guild_id,
+                    allow_proxy,
+                    id_type,
+                    guild_type
+                ) SELECT 
+                    id,
+                    guild_id,
+                    allow_proxy,
+                    id_type,
+                    guild_type
+                FROM permission_overrides;
+                """)
+                await self.connection.execute("""
+                DROP TABLE guild_preferences;
+                """)
+                await self.connection.execute("""
+                DROP TABLE autoproxies;
+                """)
+                await self.connection.execute("""
+                DROP TABLE permission_overrides;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE guild_preferences_new RENAME TO guild_preferences;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE autoproxies_new RENAME TO autoproxies;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE permission_overrides_new RENAME TO permission_overrides;
                 """)
             except:
                 pass
