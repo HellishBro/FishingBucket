@@ -8,6 +8,7 @@ from .api_app import Application, require_session
 from .api_database import Session, Database
 from .batch_edit import handle_batch_edit
 from .models import Proxy, ProxyGroup, ModifiedItemResponse, BatchEdit, LoginInformation
+from ..backend.database import Platform
 
 app = Application()
 router = app.create_router("/api/v1")
@@ -65,7 +66,8 @@ async def _(request: Request) -> LoginInformation:
             async with session.get(f"{app.context.config.api_url}/users/@me", headers={"Authorization": "Bearer " + access_token}) as resp_user:
                 obj = await resp_user.json()
                 user_id = int(obj["id"])
-                session_id = await Database.instance.new_session(user_id, obj)
+                native_id = await app.context.database.get_user_id(user_id, Platform.Fluxer)
+                session_id = await Database.instance.new_session(native_id, obj)
                 return LoginInformation(session_id=session_id, user=obj)
 
 
