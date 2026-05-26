@@ -224,7 +224,6 @@ async def on_user_message(message: fluxer.Message, bot: fluxer.Bot):
     ):
         guild_id = await get_guild_id_from_channel(bot, message.channel_id)
         autoproxy_prefs = await Database.instance.get_autoproxy_preference(owner, Guild(guild_id, Platform.Fluxer))
-        print(autoproxy_prefs)
         proxied = await get_proxied_messages(message.content, owner, autoproxy_prefs)
         if proxied:
             parent = None
