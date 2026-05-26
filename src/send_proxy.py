@@ -72,12 +72,12 @@ async def fetch_webhook(bot: fluxer.Bot, webhook_id: int) -> fluxer.Webhook | No
 async def get_webhook(channel_id: int, bot: fluxer.Bot) -> fluxer.Webhook:
     webhook = None
 
-    if webhook_id := await Database.instance.get_channel_webhook(channel_id):
+    if webhook_id := await Database.instance.get_channel_webhook(channel_id, Platform.Fluxer):
         webhook = await fetch_webhook(bot, webhook_id)
 
     if webhook is None:
         webhook = await bot.create_webhook(str(channel_id), name=Config.instance.webhook)
-        await Database.instance.put_channel_webhook_link(channel_id, int(webhook.id))
+        await Database.instance.put_channel_webhook_link(channel_id, int(webhook.id), Platform.Fluxer)
 
     return webhook
 

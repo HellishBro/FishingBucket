@@ -154,8 +154,10 @@ class Database:
         """)
         await self.connection.execute("""
         CREATE TABLE IF NOT EXISTS channel_webhook_map (
-            channel_id INTEGER PRIMARY KEY,
-            webhook_id INTEGER
+            channel_id INTEGER,
+            webhook_id INTEGER,
+            guild_type INTEGER,
+            PRIMARY KEY (channel_id, webhook_id)
         );
         """)
         await self.connection.execute("""
@@ -614,6 +616,39 @@ class Database:
                 await self.connection.commit()
             version += 1
 
+        if version == 11:
+            try:
+                await self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS channel_webhook_map_new (
+                    channel_id INTEGER,
+                    webhook_id INTEGER,
+                    guild_type INTEGER,
+                    PRIMARY KEY (channel_id, webhook_id)
+                );
+                """)
+                await self.connection.execute("""
+                INSERT INTO channel_webhook_map_new (
+                    channel_id,
+                    webhook_id,
+                    guild_type
+                ) SELECT
+                    channel_id,
+                    webhook_id,
+                    0
+                FROM channel_webhook_map;
+                """)
+                await self.connection.execute("""
+                DROP TABLE channel_webhook_map;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE channel_webhook_map_new RENAME TO channel_webhook_map;
+                """)
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
         await self.set_global_data("version", str(version), version)
 
     @Cache.user_id.cache_async()
@@ -917,19 +952,19 @@ class Database:
         if resolution: return resolution[-1]
         return True
 
-    async def put_channel_webhook_link(self, channel_id: int, webhook_id: int):
+    async def put_channel_webhook_link(self, channel_id: int, webhook_id: int, platform: Platform):
         await self.connection.execute(
-            "INSERT INTO channel_webhook_map (channel_id, webhook_id) VALUES (?, ?) ON CONFLICT(channel_id) DO UPDATE SET webhook_id = ?",
-            (channel_id, webhook_id, webhook_id)
+            "INSERT INTO channel_webhook_map (channel_id, webhook_id, guild_type) VALUES (?, ?, ?) ON CONFLICT(channel_id, guild_type) DO UPDATE SET webhook_id = ?",
+            (channel_id, webhook_id, platform.get(), webhook_id)
         )
         Cache.webhook_link.invalidate((channel_id, ))
         await self.connection.commit()
 
     @Cache.webhook_link.cache_async()
-    async def get_channel_webhook(self, channel_id: int) -> int | None:
+    async def get_channel_webhook(self, channel_id: int, platform: Platform) -> int | None:
         async with self.connection.execute(
-            "SELECT webhook_id FROM channel_webhook_map WHERE channel_id = ?",
-            (channel_id, )
+            "SELECT webhook_id FROM channel_webhook_map WHERE channel_id = ? AND guild_type = ?",
+            (channel_id, platform.get())
         ) as cursor:
             res = await cursor.fetchone()
             return res[0] if res else None

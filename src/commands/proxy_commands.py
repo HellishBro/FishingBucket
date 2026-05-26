@@ -247,7 +247,7 @@ def setup(bot: fluxer.Bot):
         if proxy_id:
             proxy = await Database.instance.get_proxy(proxy_id)
             if proxy.owner == await get_uid(message):
-                webhook_id = await Database.instance.get_channel_webhook(parent.channel_id)
+                webhook_id = await Database.instance.get_channel_webhook(parent.channel_id, Platform.Fluxer)
                 if webhook_id:
                     await message.delete()
                     await edit_proxy_message(parent, bot, new)
