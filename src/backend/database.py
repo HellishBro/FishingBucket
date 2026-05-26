@@ -157,7 +157,7 @@ class Database:
             channel_id INTEGER,
             webhook_id INTEGER,
             guild_type INTEGER,
-            PRIMARY KEY (channel_id, webhook_id)
+            PRIMARY KEY (channel_id, guild_type)
         );
         """)
         await self.connection.execute("""
@@ -635,6 +635,39 @@ class Database:
                     channel_id,
                     webhook_id,
                     0
+                FROM channel_webhook_map;
+                """)
+                await self.connection.execute("""
+                DROP TABLE channel_webhook_map;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE channel_webhook_map_new RENAME TO channel_webhook_map;
+                """)
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
+        if version == 12:
+            try:
+                await self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS channel_webhook_map_new (
+                    channel_id INTEGER,
+                    webhook_id INTEGER,
+                    guild_type INTEGER,
+                    PRIMARY KEY (channel_id, guild_type)
+                );
+                """)
+                await self.connection.execute("""
+                INSERT INTO channel_webhook_map_new (
+                    channel_id,
+                    webhook_id,
+                    guild_type
+                ) SELECT
+                    channel_id,
+                    webhook_id,
+                    guild_type
                 FROM channel_webhook_map;
                 """)
                 await self.connection.execute("""
