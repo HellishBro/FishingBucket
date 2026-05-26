@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Collection
 import aiosqlite as sql
 import time
 from collections import namedtuple
@@ -13,22 +13,24 @@ lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner
 proxy_fields = ", ".join(lst_proxy_fields)
 group_fields = ", ".join(["id", "name", "description", "owner", "creation_date", "tag", "parent"])
 
-def upsert_query(table: str, key: str, key_check: Any, names: dict[str, tuple[Any, Any]], changes: list[str], values: list[Any]) -> tuple[str, tuple[Any]]:
+def upsert_query(table: str, key: str | Collection[str], key_check: Any | Collection[Any], names: dict[str, tuple[Any, Any]], changes: list[str], values: list[Any]) -> tuple[str, tuple[Any]]:
+    keys: Collection[str] = key if isinstance(key, tuple) else (key, )
+    key_checks: Collection[Any] = key_check if isinstance(key_check, tuple) else (key_check, )
     cols = list(names.keys())
     defaults = [t[1] if t[0] is None else t[0] for t in names.values()]
-    placeholders = ", ".join(["?"] * (1 + len(cols)))
+    placeholders = ", ".join(["?"] * (len(keys) + len(cols)))
     col_list = ", ".join(cols)
     update_parts = ", ".join(
         f"{k} = ?" if k in changes else f"{k} = {k}"
         for k in cols
     )
     sql_str = (
-        f"INSERT INTO {table} ({key}, {col_list}) "
+        f"INSERT INTO {table} ({', '.join(keys)}, {col_list}) "
         f"VALUES ({placeholders}) "
-        f"ON CONFLICT({key}) DO UPDATE SET {update_parts} "
-        f"WHERE {key} = ?"
+        f"ON CONFLICT({', '.join(keys)}) DO UPDATE SET {update_parts} "
+        f"WHERE {' AND '.join(k + ' = ?' for k in keys)}"
     )
-    params = (key_check, ) + tuple(defaults) + tuple(values) + (key_check, )
+    params = tuple(key_checks) + tuple(defaults) + tuple(values) + tuple(key_checks)
     return sql_str, params
 
 class Platform(Enum):
@@ -781,7 +783,7 @@ class Database:
     async def remove_all_overrides(self, guild: Guild):
         await self.connection.execute(
             "DELETE FROM permission_overrides WHERE guild_id = ? AND guild_type = ?",
-            (guild.guild_id, guild.guild_type)
+            (guild.guild_id, guild.guild_type.get())
         )
         await self.connection.commit()
         for id_type in range(3):
@@ -806,7 +808,7 @@ class Database:
         true_compare_list = (disallow_by_default, logging_channel, dice_functions)
         true_compare_list = tuple((a if a is not None else b for a, b in zip(true_compare_list, prefs)))
         if prefs != true_compare_list:
-            await self.connection.execute(*upsert_query("guild_preferences", "guild_id", guild.guild_id, names, changes, values))
+            await self.connection.execute(*upsert_query("guild_preferences", ("guild_id", "guild_type"), (guild.guild_id, guild.guild_type.get()), names, changes, values))
             await self.connection.commit()
             Cache.guild_preferences.invalidate((guild, ))
             Cache.guild_role_allows.invalidate(guild)
