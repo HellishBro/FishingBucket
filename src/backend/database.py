@@ -593,6 +593,27 @@ class Database:
                 await self.connection.commit()
             version += 1
 
+        if version == 10:
+            try:
+                await self.connection.execute("""
+                UPDATE user_settings 
+                    SET user_id = (SELECT owner FROM accounts 
+                                   WHERE accounts.user_id = user_settings.user_id 
+                                   AND accounts.account_type = 0)
+                    WHERE EXISTS (SELECT 1 FROM accounts 
+                                  WHERE accounts.user_id = user_settings.user_id 
+                                  AND accounts.account_type = 0)
+                    AND (SELECT COUNT(*) FROM accounts 
+                         WHERE owner = (SELECT owner FROM accounts 
+                                        WHERE accounts.user_id = user_settings.user_id 
+                                        AND accounts.account_type = 0)) = 1;
+                """) # forgive me for this chatgpt'd nonsense
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
         await self.set_global_data("version", str(version), version)
 
     @Cache.user_id.cache_async()
