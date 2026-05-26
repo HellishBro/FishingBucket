@@ -3,7 +3,7 @@ import fluxer
 from fluxer.models import RawReactionActionEvent
 
 from .utils import proxy_username, ensure_own_proxy, paged_group_list, ensure_own_group, paged_proxy_list, \
-    valid_template, get_group_text
+    valid_template, get_group_text, get_uid
 from .. import response
 from ..backend.database import Database
 from ..commands import register_command, register_group
@@ -23,7 +23,7 @@ def setup(bot: fluxer.Bot):
                        'group register "The System"'], "group", ["g r"])
     async def group_register(message: fluxer.Message, name: str, description: str | None):
         description = description or ""
-        g = await Database.instance.put_group(ProxyGroup(None, name, description, message.author.id, time.time(), "", None))
+        g = await Database.instance.put_group(ProxyGroup(None, name, description, await get_uid(message), time.time(), "", None))
         await response.respond(message, "", [fluxer.Embed(
             "Group Registered!",
             f"The group **{name}** (`{str(hex(g.id))[2:]}`) has been registered{(' with the description:\n' + '\n'.join('> ' + l for l in description.split('\n'))) if description else '.'}"
@@ -38,7 +38,7 @@ def setup(bot: fluxer.Bot):
         if (await get_guild_id_from_channel(bot, message.channel_id)) is None:
             detailed = True
 
-        await paged_group_list(message, await Database.instance.get_user_groups(message.author.id),
+        await paged_group_list(message, await Database.instance.get_user_groups(await get_uid(message)),
                                f"Proxy Groups of {message.author.display_name}", page, detailed)
 
     @register_command([str], bot, "group", """
@@ -54,7 +54,7 @@ def setup(bot: fluxer.Bot):
 
         embed = fluxer.Embed(
             f"{g.name}",
-            (await get_group_text([g], await Database.instance.get_user_preferences(message.author.id), detailed))
+            (await get_group_text([g], await Database.instance.get_user_preferences(await get_uid(message)), detailed))
         )
         await response.respond(message, "", [embed])
 
@@ -63,7 +63,7 @@ def setup(bot: fluxer.Bot):
     """, "group members <group> [page]", ["group members 2d7", "group members 2d7 5"], "group", ["g m"])
     async def group_members(message: fluxer.Message, group_id: str, page: int | None):
         if not (group := await ensure_own_group(message, group_id)): return
-        proxies = await Database.instance.get_user_proxies(message.author.id)
+        proxies = await Database.instance.get_user_proxies(await get_uid(message))
         filtered = [proxy for proxy in proxies if proxy.group and proxy.group.id == group.id]
         detailed = False
         if (await get_guild_id_from_channel(bot, message.channel_id)) is None:

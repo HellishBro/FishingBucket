@@ -1,7 +1,7 @@
 import fluxer
 from fluxer.models import RawReactionActionEvent
 
-from .utils import proxy_username, ensure_own_proxy, valid_template, example_trigger_text
+from .utils import proxy_username, ensure_own_proxy, valid_template, example_trigger_text, get_uid
 from .. import response
 from ..backend.database import Database
 from ..backend.utils import normalize_emojis
@@ -250,7 +250,8 @@ def setup(bot: fluxer.Bot):
     This action is irreversible! Make sure you really want to do this!
     """, "nuke", ["nuke"], "proxy_act")
     async def nuke(message: fluxer.Message):
-        proxies = await Database.instance.get_user_proxies(int(message.author.id))
+        owner = await get_uid(message)
+        proxies = await Database.instance.get_user_proxies(owner)
 
         if not proxies:
             await response.respond(message, "You have no proxies to delete!")
@@ -263,7 +264,7 @@ def setup(bot: fluxer.Bot):
 
         async def cb(event: RawReactionActionEvent):
             if event.emoji.name == "✅":
-                await Database.instance.delete_data(int(message.author.id))
+                await Database.instance.delete_data(owner)
                 await response.respond(message, f"Successfully nuked your proxies!")
 
         Interactions.instance.add_interaction(msg_id, Interaction(message.author.id, cb, 10))

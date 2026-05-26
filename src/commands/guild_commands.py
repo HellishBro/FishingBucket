@@ -3,7 +3,7 @@ import fluxer
 from .utils import require_permission
 from .. import response
 from ..backend.config import Config
-from ..backend.database import Database
+from ..backend.database import Database, Guild, Platform
 from ..commands import register_command, register_group
 from ..backend.models import alternative, one_or_more
 
@@ -22,10 +22,11 @@ def setup(bot: fluxer.Bot):
          'allow proxy #roleplay-city @can-proxy default', 'allow proxy @proxy-muted false'], "guild")
     async def allow_proxy(message: fluxer.Message, allowlist: list[fluxer.Channel | fluxer.Role | fluxer.User] | str, allow: bool | str):
         if not await require_permission(message, 0x20, "Manage Community"): return
+        guild = Guild(message.guild_id, Platform.Fluxer)
 
         allow = ("allow" if allow else "disallow") if isinstance(allow, bool) else allow
         if allowlist == "global":
-            await Database.instance.set_guild_preferences(message.guild_id, allow not in ("allow", "default"), None)
+            await Database.instance.set_guild_preferences(guild, allow not in ("allow", "default"), None)
             await response.respond(message, "", embeds=[fluxer.Embed(
                 "Community Settings Changed!",
                 f"Community default has been changed to {'allowing' if allow in ('allow', 'default') else 'disallowing'} proxying. Any previous or future channel-specific override will override this default. View them by using the `list allows` command."
@@ -44,7 +45,7 @@ def setup(bot: fluxer.Bot):
                     id_type = 2
                     mentions.append(f"<@{thing.id}>")
 
-                await Database.instance.override_permission(thing.id, message.guild_id, allow, id_type)
+                await Database.instance.override_permission(thing.id, Guild(message.guild_id, Platform.Fluxer), allow, id_type)
 
             t = {"allow": "allowing proxying", "disallow": "disallowing proxying", "default": "default proxy settings"}[allow]
             await response.respond(message, "", embeds=[fluxer.Embed(
@@ -60,9 +61,10 @@ def setup(bot: fluxer.Bot):
     """, "reset allows", ["reset allows"], "guild")
     async def reset_allows(message: fluxer.Message):
         if not await require_permission(message, 0x20, "Manage Community"): return
+        guild = Guild(message.guild_id, Platform.Fluxer)
 
-        await Database.instance.remove_all_overrides(int(message.guild_id))
-        await Database.instance.set_guild_preferences(message.guild_id, False, None)
+        await Database.instance.remove_all_overrides(guild)
+        await Database.instance.set_guild_preferences(guild, False, None)
         await response.respond(message, "", embeds=[fluxer.Embed(
             "Community Settings Changed!",
             f"All custom community proxy settings has been reset to allow proxying."
@@ -73,13 +75,14 @@ def setup(bot: fluxer.Bot):
     You *do not* need the Manage Community permission to use this command.
     """, "list allows", ["list allows"], "guild")
     async def list_allows(message: fluxer.Message):
-        preferences = await Database.instance.get_guild_preferences(message.guild_id)
+        guild = Guild(message.guild_id, Platform.Fluxer)
+        preferences = await Database.instance.get_guild_preferences(guild)
         guild_disallow = preferences[0]
         allow_list = []
         disallow_list = []
 
         for id_type in range(3):
-            overrides = await Database.instance.get_guild_overrides(message.guild_id, id_type)
+            overrides = await Database.instance.get_guild_overrides(guild, id_type)
             for override, allow in overrides.items():
                 lst = allow_list if allow == "allow" else disallow_list if allow == "disallow" else []
                 if id_type == 0:
@@ -102,14 +105,15 @@ def setup(bot: fluxer.Bot):
     If `channel` is set to "clear", then no logging will happen.
     """, 'logging channel <channel OR "clear">', ["logging channel clear", "logging channel #logging"], "guild")
     async def logging_channel(message: fluxer.Message, channel: str | fluxer.Channel):
+        guild = Guild(message.guild_id, Platform.Fluxer)
         if channel == "clear":
-            await Database.instance.set_guild_preferences(message.guild_id, None, 0)
+            await Database.instance.set_guild_preferences(guild, None, 0)
             await response.respond(message, "", embeds=[fluxer.Embed(
                 "Community Settings Changed!",
                 "Logging is now disabled for this community!"
             )])
         else:
-            await Database.instance.set_guild_preferences(message.guild_id, None, channel.id)
+            await Database.instance.set_guild_preferences(guild, None, channel.id)
             await response.respond(message, "", embeds=[fluxer.Embed(
                 "Community Settings Changed!",
                 f"Proxied messages will be logged to <#{channel.id}>."

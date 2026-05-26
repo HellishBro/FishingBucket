@@ -9,7 +9,7 @@ from expr_dice_roller.evaluator import EvalFunc
 
 from .utils import require_permission
 from .. import response
-from ..backend.database import Database
+from ..backend.database import Database, Guild, Platform
 from ..backend.dice_environments import global_functions
 from ..backend.models import alternative, optional_type
 from . import register_command, register_group
@@ -26,7 +26,8 @@ def setup(bot: fluxer.Bot):
     async def dice_roll(message: fluxer.Message, roll: str):
         guild_id = (await bot.fetch_channel(str(message.channel_id))).guild_id
         user_fns = (await Database.instance.get_user_preferences(message.author.id)).dice_functions
-        guild_fns = (await Database.instance.get_guild_preferences(guild_id)).dice_functions
+        guild = Guild(guild_id, Platform.Fluxer)
+        guild_fns = (await Database.instance.get_guild_preferences(guild)).dice_functions
         evaluator = dice.Evaluator()
         if user_fns:
             user_env = dice.Environment.deserialize(evaluator, user_fns)
@@ -57,6 +58,7 @@ def setup(bot: fluxer.Bot):
             lists = "all"
 
         guild_id = (await bot.fetch_channel(str(message.channel_id))).guild_id
+        guild = Guild(guild_id, Platform.Fluxer)
         fns = None
         user_fns = None
         guild_fns = None
@@ -65,7 +67,7 @@ def setup(bot: fluxer.Bot):
             fns = (await Database.instance.get_user_preferences(message.author.id)).dice_functions
             user_fns = fns
         if target == "community" or target == "all":
-            fns = (await Database.instance.get_guild_preferences(guild_id)).dice_functions
+            fns = (await Database.instance.get_guild_preferences(guild)).dice_functions
             guild_fns = fns
         if target == "global":
             env = global_functions()
@@ -116,14 +118,14 @@ def setup(bot: fluxer.Bot):
     Sets a variable used in dice expressions.
     """, 'dice set variable <"user" OR "community"> <name> <value>', ["dice set variable user level 10"], "dice")
     async def set_variable(message: fluxer.Message, target: Literal["user"] | Literal["community"], name: str, value: float):
-        guild_id = None
         if target == "user":
             fns = (await Database.instance.get_user_preferences(message.author.id)).dice_functions
             preface = "Your"
         else:
             if not await require_permission(message, 0x20, "Manage Community"): return
             guild_id = (await bot.fetch_channel(str(message.channel_id))).guild_id
-            fns = (await Database.instance.get_guild_preferences(guild_id)).dice_functions
+            guild = Guild(guild_id, Platform.Fluxer)
+            fns = (await Database.instance.get_guild_preferences(guild)).dice_functions
             preface = "This community's"
 
         if fns:
@@ -136,7 +138,7 @@ def setup(bot: fluxer.Bot):
         if target == "user":
             await Database.instance.set_user_preferences(message.author.id, dice_functions=env.serialize())
         else:
-            await Database.instance.set_guild_preferences(guild_id, dice_functions=env.serialize())
+            await Database.instance.set_guild_preferences(guild, dice_functions=env.serialize())
 
         await response.respond(message, "", [fluxer.Embed("Dice Variable Set", f"{preface} dice variables has been updated!\n`{name}` = {value:g}")])
 
@@ -151,7 +153,8 @@ def setup(bot: fluxer.Bot):
         else:
             if not await require_permission(message, 0x20, "Manage Community"): return
             guild_id = (await bot.fetch_channel(str(message.channel_id))).guild_id
-            fns = (await Database.instance.get_guild_preferences(guild_id)).dice_functions
+            guild = Guild(guild_id, Platform.Fluxer)
+            fns = (await Database.instance.get_guild_preferences(guild)).dice_functions
             preface = "This community's"
 
         tree = Parser(Lexer(expression).lex()).expression()
@@ -169,7 +172,7 @@ def setup(bot: fluxer.Bot):
         if target == "user":
             await Database.instance.set_user_preferences(message.author.id, dice_functions=env.serialize())
         else:
-            await Database.instance.set_guild_preferences(guild_id, dice_functions=env.serialize())
+            await Database.instance.set_guild_preferences(guild, dice_functions=env.serialize())
 
         await response.respond(message, "", [fluxer.Embed("Dice Function Set", f"{preface} dice functions has been updated!\n{dice.format_expression(expression)}")])
 
@@ -185,7 +188,8 @@ def setup(bot: fluxer.Bot):
         else:
             if not await require_permission(message, 0x20, "Manage Community"): return
             guild_id = (await bot.fetch_channel(str(message.channel_id))).guild_id
-            fns = (await Database.instance.get_guild_preferences(guild_id)).dice_functions
+            guild = Guild(guild_id, Platform.Fluxer)
+            fns = (await Database.instance.get_guild_preferences(guild)).dice_functions
             preface = "This community's"
 
         if fns:
@@ -199,7 +203,7 @@ def setup(bot: fluxer.Bot):
         if target == "user":
             await Database.instance.set_user_preferences(message.author.id, dice_functions=env.serialize())
         else:
-            await Database.instance.set_guild_preferences(guild_id, dice_functions=env.serialize())
+            await Database.instance.set_guild_preferences(guild, dice_functions=env.serialize())
 
         await response.respond(message, "", [fluxer.Embed("Dice Variable Removed",
                                                           f"{preface} dice variables has been updated! Variable `{name}` no longer exists.")])

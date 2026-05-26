@@ -3,9 +3,9 @@ import fluxer
 from textdistance import damerau_levenshtein
 
 from .utils import proxy_username, paged_proxy_list, ensure_own_proxy, get_proxies_text, require_reply, valid_template, \
-    example_trigger_text
+    example_trigger_text, get_uid
 from .. import response
-from ..backend.database import Database
+from ..backend.database import Database, Platform, Guild
 from ..commands import register_command, register_group
 from ..interaction import Interactions
 from ..interactions_impl import show_proxy_info
@@ -32,7 +32,7 @@ def setup(bot: fluxer.Bot):
         else:
             avatar_url = message.attachments[0].url
 
-        new_proxy = await Database.instance.put_proxy(Proxy(None, name, "", avatar_url, [trigger], int(message.author.id), 0, time.time(), None, "", {}, None))
+        new_proxy = await Database.instance.put_proxy(Proxy(None, name, "", avatar_url, [trigger], await get_uid(message), 0, time.time(), None, "", {}, None))
         hex_id = str(hex(new_proxy.id))[2:].lower()
         embed = fluxer.Embed(
             f"{name} (`{hex_id}`)",
@@ -48,9 +48,9 @@ def setup(bot: fluxer.Bot):
     If `page` is provided, it will display the proxies on that page number. Defaults to 1.
     """, "list [user] [page]", ["list", "list 4", "list @Gordon", "list @Phil 43"], "proxy", ["l"])
     async def list_(message: fluxer.Message, user: fluxer.User | None, page: int | None):
-        uid = user.id if user else message.author.id
+        uid = await Database.instance.get_user_id(user.id if user else message.author.id, Platform.Fluxer)
         name = user.display_name if user else message.author.display_name
-        if (await Database.instance.get_user_preferences(uid)).private_list and uid != message.author.id:
+        if (await Database.instance.get_user_preferences(uid)).private_list and user and user.id != message.author.id:
             await response.respond(message, "That user have a private proxy list!")
             return
 
@@ -79,9 +79,14 @@ def setup(bot: fluxer.Bot):
 
         name = normalize_emojis(name)
 
-        proxies = await Database.instance.get_user_proxies(message.author.id)
+        proxies = await Database.instance.get_user_proxies(await get_uid(message))
         proxies = [proxy for proxy in proxies if (name.lower() in proxy.name.lower()) or (name.lower() in (proxy.nickname or "").lower())]
-        distances = {i: min(damerau_levenshtein(name.lower(), valid_proxy.name.lower()), damerau_levenshtein(name.lower(), (valid_proxy.nickname or valid_proxy.name).lower())) for i, valid_proxy in enumerate(proxies)}
+        distances = {
+            i: min(
+                damerau_levenshtein(name.lower(), valid_proxy.name.lower()),
+                damerau_levenshtein(name.lower(), (valid_proxy.nickname or valid_proxy.name).lower())
+            ) for i, valid_proxy in enumerate(proxies)
+        }
         distances = {k: v for k, v in distances.items() if v <= 5}
         sorted_distances = dict(sorted(distances.items(), key=lambda kv: kv[1]))
         sorted_indices = sorted_distances.keys()
@@ -107,7 +112,7 @@ def setup(bot: fluxer.Bot):
         channel_id = message.channel_id
         if message.referenced_message:
             message_id = message.referenced_message.id
-            proxy_id = await Database.instance.get_proxy_id(message_id, channel_id)
+            proxy_id = (await Database.instance.get_message_link(message_id, channel_id)).proxy_id
             old_proxy = await ensure_own_proxy(message, proxy_id)
             if not old_proxy: return
         else:
@@ -118,14 +123,14 @@ def setup(bot: fluxer.Bot):
                     await response.delete_message(m)
                     await message.delete()
                 return
-            proxy_id = await Database.instance.get_proxy_id(message_id, channel_id)
+            proxy_id = (await Database.instance.get_message_link(message_id, channel_id)).proxy_id
             old_proxy = await Database.instance.get_proxy(proxy_id)
 
         new_proxy = await ensure_own_proxy(message, new_id)
         if not new_proxy: return
         parent = await bot.fetch_message(str(channel_id), str(message_id))
         await message.delete()
-        await proxy_reproxy(parent, bot, old_proxy, new_proxy)
+        await proxy_reproxy(parent, bot, old_proxy, new_proxy, message.author.id, Platform.Fluxer)
 
     @register_command([alternative(bool, str), alternative("global", "community"), optional_type(alternative(float, "never"))], bot, "autoproxy", """
     Automatically proxies your messages.
@@ -149,21 +154,23 @@ def setup(bot: fluxer.Bot):
             guild_id = await get_guild_id_from_channel(bot, message.channel_id)
             postfix = "in this community"
 
+        uid = await get_uid(message)
+
         if setting is True:
-            await Database.instance.set_autoproxy_preference(message.author.id, guild_id, None, expires)
+            await Database.instance.set_autoproxy_preference(uid, Guild(guild_id, Platform.Fluxer), None, expires)
             await response.respond(message, f"Autoproxy has been set to latch mode {postfix}!")
         elif setting is False:
             if mode == "all":
-                await Database.instance.remove_all_autoproxy_preference(message.author.id)
+                await Database.instance.remove_all_autoproxy_preference(uid)
                 await response.respond(message, "Autoproxy has been turned off for everything.")
                 return
 
-            await Database.instance.remove_autoproxy_preference(message.author.id, guild_id)
+            await Database.instance.remove_autoproxy_preference(uid, Guild(guild_id, Platform.Fluxer))
             await response.respond(message, f"Autoproxy has been turned off {postfix}.")
         else:
             if not (proxy := await ensure_own_proxy(message, setting)):
                 return
-            await Database.instance.set_autoproxy_preference(message.author.id, guild_id, proxy.id, expires)
+            await Database.instance.set_autoproxy_preference(uid, Guild(guild_id, Platform.Fluxer), proxy.id, expires)
             await response.respond(message, f"Autoproxying as **{proxy.name}** {postfix}.")
 
 
@@ -211,10 +218,10 @@ def setup(bot: fluxer.Bot):
     """, "delete", ["delete"], "proxy")
     async def delete(message: fluxer.Message):
         if not (parent := await require_reply(message)): return
-        proxy_id = await Database.instance.get_proxy_id(parent.id, parent.channel_id)
+        proxy_id = (await Database.instance.get_message_link(parent.id, parent.channel_id)).proxy_id
         if proxy_id:
             proxy = await Database.instance.get_proxy(proxy_id)
-            if proxy.owner == message.author.id:
+            if proxy.owner == await get_uid(message):
                 await Database.instance.delete_link_message(parent.id, parent.channel_id)
                 await parent.delete()
                 await message.delete()
@@ -236,11 +243,11 @@ def setup(bot: fluxer.Bot):
     """, "edit <message>", ["edit We grew apart..."], "proxy")
     async def edit(message: fluxer.Message, new: str):
         if not (parent := await require_reply(message)): return
-        proxy_id = await Database.instance.get_proxy_id(parent.id, parent.channel_id)
+        proxy_id = (await Database.instance.get_message_link(parent.id, parent.channel_id)).proxy_id
         if proxy_id:
             proxy = await Database.instance.get_proxy(proxy_id)
-            if proxy.owner == message.author.id:
-                webhook_id = await Database.instance.get_channel_webhook(parent.channel_id)
+            if proxy.owner == await get_uid(message):
+                webhook_id = await Database.instance.get_channel_webhook(parent.channel_id, Platform.Fluxer)
                 if webhook_id:
                     await message.delete()
                     await edit_proxy_message(parent, bot, new)

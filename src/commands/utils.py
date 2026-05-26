@@ -7,7 +7,7 @@ from textdistance import damerau_levenshtein
 from ..backend.config import Config
 from ..interaction import Interaction, Interactions, remove_reaction
 from .. import response
-from ..backend.database import Database, UserPreference
+from ..backend.database import Database, UserPreference, Platform
 from ..backend.models import Proxy, ProxyGroup, string_with_length
 from ..backend.template_utils import Template, TextPart, ExprPart
 from ..backend.utils import format_date, get_member, compute_permissions, normalize_emojis
@@ -120,7 +120,7 @@ def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detail
 
 async def paged_proxy_list(message: fluxer.Message, proxies: list[Proxy], title: str, page: int | None, detailed = False):
     if len(proxies):
-        preferences = await Database.instance.get_user_preferences(message.author.id)
+        preferences = await Database.instance.get_user_preferences(await get_uid(message))
         pages = []
         show_groups = not preferences.private_group or detailed
         if show_groups:
@@ -191,7 +191,7 @@ async def get_group_text(bunch: list[ProxyGroup], user_preference: UserPreferenc
 
 async def paged_group_list(message: fluxer.Message, groups: list[ProxyGroup], title: str, page: int | None, detailed = False):
     if len(groups):
-        preferences = await Database.instance.get_user_preferences(message.author.id)
+        preferences = await Database.instance.get_user_preferences(await get_uid(message))
         pages = [
             await get_group_text(groups[g * 10: g * 10 + 10], preferences, detailed)
             for g in range(math.ceil(len(groups) / 10))
@@ -239,9 +239,11 @@ async def ensure_own_proxy(message: fluxer.Message, id_: str | int) -> Proxy | N
     except ValueError:
         find_name = True
 
+    owner = await get_uid(message)
+
     if find_name:
         id_ = normalize_emojis(id_)
-        valid_proxies = await Database.instance.get_user_proxies(message.author.id)
+        valid_proxies = await Database.instance.get_user_proxies(owner)
         distances = [min(damerau_levenshtein(id_.lower(), valid_proxy.name.lower()), damerau_levenshtein(id_.lower(), (valid_proxy.nickname or valid_proxy.name).lower())) for valid_proxy in valid_proxies]
         minimum = min(distances) if distances else 999
         if minimum > 5:
@@ -253,7 +255,7 @@ async def ensure_own_proxy(message: fluxer.Message, id_: str | int) -> Proxy | N
     if not proxy:
         await response.respond(message, "This proxy does not exist!")
         return None
-    if proxy.owner != await Database.instance.get_user_id(message.author.id):
+    if proxy.owner != owner:
         await response.respond(message, "You do not own this proxy!")
         return None
     return proxy
@@ -275,9 +277,11 @@ async def ensure_own_group(message: fluxer.Message, id_: str | int) -> ProxyGrou
     except ValueError:
         find_name = True
 
+    owner = await get_uid(message)
+
     if find_name:
         id_ = normalize_emojis(id_)
-        valid_groups = await Database.instance.get_user_groups(message.author.id)
+        valid_groups = await Database.instance.get_user_groups(owner)
         distances = [damerau_levenshtein(id_.lower(), valid_group.name.lower()) for valid_group in valid_groups]
         minimum = min(distances) if distances else 999
         if minimum > 5:
@@ -289,7 +293,7 @@ async def ensure_own_group(message: fluxer.Message, id_: str | int) -> ProxyGrou
     if not group:
         await response.respond(message, "This group does not exist!")
         return None
-    if group.owner != await Database.instance.get_user_id(message.author.id):
+    if group.owner != owner:
         await response.respond(message, "You do not own this group!")
         return None
     return group
@@ -333,3 +337,6 @@ def example_trigger_text(trigger: str) -> str:
         else:
             res += "hello"
     return res
+
+async def get_uid(message: fluxer.Message) -> int:
+    return await Database.instance.get_user_id(message.author.id, Platform.Fluxer)
