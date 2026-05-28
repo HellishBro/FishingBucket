@@ -5,7 +5,8 @@ from textdistance import damerau_levenshtein
 from .utils import proxy_username, paged_proxy_list, ensure_own_proxy, get_proxies_text, require_reply, valid_template, \
     example_trigger_text, get_uid
 from .. import response
-from ..backend.database import Database, Platform, Guild
+from ..backend.database import Database, Guild
+from ..service import Platform
 from ..commands import register_command, register_group
 from ..interaction import Interactions
 from ..interactions_impl import show_proxy_info

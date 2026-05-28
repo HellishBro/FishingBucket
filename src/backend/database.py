@@ -4,10 +4,10 @@ import aiosqlite as sql
 import time
 from collections import namedtuple
 from dataclasses import dataclass
-from enum import Enum, auto
 
 from .cache import TTLCache
 from .models import Proxy, ProxyGroup
+from ..service import Platform
 
 lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner", "times_used", "creation_date", "proxy_group", "nickname", "proxy_forms", "current_form"]
 proxy_fields = ", ".join(lst_proxy_fields)
@@ -32,21 +32,6 @@ def upsert_query(table: str, key: str | Collection[str], key_check: Any | Collec
     )
     params = tuple(key_checks) + tuple(defaults) + tuple(values) + tuple(key_checks)
     return sql_str, params
-
-class Platform(Enum):
-    Fluxer = auto()
-    Discord = auto()
-
-    def get(self) -> int:
-        if self == Platform.Fluxer:
-            return 0
-        else:
-            return 1
-
-    @classmethod
-    def from_(cls, id_: int) -> Platform:
-        return [Platform.Fluxer, Platform.Discord][id_]
-
 
 class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list private_forms dice_functions")):
     private_description: bool

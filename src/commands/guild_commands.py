@@ -3,7 +3,8 @@ import fluxer
 from .utils import require_permission
 from .. import response
 from ..backend.config import Config
-from ..backend.database import Database, Guild, Platform
+from ..backend.database import Database, Guild
+from ..service import Platform
 from ..commands import register_command, register_group
 from ..backend.models import alternative, one_or_more
 

@@ -9,7 +9,8 @@ from expr_dice_roller.evaluator import EvalFunc
 
 from .utils import require_permission
 from .. import response
-from ..backend.database import Database, Guild, Platform
+from ..backend.database import Database, Guild
+from ..service import Platform
 from ..backend.dice_environments import global_functions
 from ..backend.models import alternative, optional_type
 from . import register_command, register_group

@@ -6,7 +6,8 @@ from fluxer.models import RawReactionActionEvent
 
 from .interaction import Interactions, message_reactions, remove_reaction
 from .commands import command_list
-from .backend.database import Database, Platform
+from .backend.database import Database
+from .service import Platform
 from .send_proxy import on_user_message, recover_original_message, edit_proxy_message
 from .backend.config import Config
 from .backend.utils import mention_message

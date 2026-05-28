@@ -7,7 +7,8 @@ from textdistance import damerau_levenshtein
 from ..backend.config import Config
 from ..interaction import Interaction, Interactions, remove_reaction
 from .. import response
-from ..backend.database import Database, UserPreference, Platform
+from ..backend.database import Database, UserPreference
+from ..service import Platform
 from ..backend.models import Proxy, ProxyGroup, string_with_length
 from ..backend.template_utils import Template, TextPart, ExprPart
 from ..backend.utils import format_date, get_member, compute_permissions, normalize_emojis

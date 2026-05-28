@@ -4,7 +4,8 @@ from fluxer.models import RawReactionActionEvent
 from . import register_group, register_command
 from .utils import get_uid
 from .. import response
-from ..backend.database import Database, Platform
+from ..backend.database import Database
+from ..service import Platform
 from ..backend.models import alternative, one_or_more
 from ..interaction import Interactions, Interaction, remove_reaction
 

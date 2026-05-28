@@ -8,7 +8,7 @@ from .api_app import Application, require_session
 from .api_database import Session, Database
 from .batch_edit import handle_batch_edit
 from .models import Proxy, ProxyGroup, ModifiedItemResponse, BatchEdit, LoginInformation
-from ..backend.database import Platform
+from ..service import Platform
 
 app = Application()
 router = app.create_router("/api/v1")

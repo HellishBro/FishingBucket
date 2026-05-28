@@ -7,7 +7,7 @@ import re
 
 from .backend.cache import TTLCache
 from .backend.config import Config
-from .backend.database import Database, GuildPreference, UserAutoproxyPreference, Platform, Guild
+from .backend.database import Database, GuildPreference, UserAutoproxyPreference, Guild
 from .backend.models import Proxy
 from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
@@ -15,6 +15,7 @@ from .backend.utils import mention_message, convert_attachments, normalize_emoji
     get_guild_id_from_channel, send_webhook
 from .commands.utils import get_uid
 from .response import delete_message
+from .service import Platform
 
 
 def message_matches_trigger(message: str, triggers: list[str]) -> tuple[bool, str]:
