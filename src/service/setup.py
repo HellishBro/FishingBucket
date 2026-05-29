@@ -1,7 +1,8 @@
 import discord
 import fluxer
 
-from . import Platform
+from .enums import Platform
+from .context import FluxerContext, DiscordContext
 from .server import Server, Fluxer, Discord
 
 
@@ -20,9 +21,11 @@ def setup(server: Server):
 def setup_fluxer(server: Fluxer):
     @server.event
     async def on_message(message: fluxer.Message):
+        context = FluxerContext(Platform.Fluxer, server.bot, message)
         print("Fluxer:", message.content)
 
 def setup_discord(server: Discord):
     @server.event
     async def on_message(message: discord.Message):
+        context = DiscordContext(Platform.Discord, server.bot, message)
         print("Discord:", message.content)

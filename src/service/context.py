@@ -32,6 +32,10 @@ class Context[Bot, Message, Embed, Attachment, Member, User, Channel, Guild](ABC
     @abstractmethod
     def is_bot(self) -> bool: pass
 
+    @property
+    @abstractmethod
+    def message_content(self) -> str: pass
+
     @abstractmethod
     async def get_member(self, user_id: int) -> Member: pass
 
@@ -68,6 +72,10 @@ class FluxerContext(Context[fluxer.Bot, fluxer.Message, fluxer.Embed, fluxer.Fil
     @property
     def guild(self) -> fluxer.Guild:
         return self.message.guild
+
+    @property
+    def message_content(self) -> str:
+        return self.message.content
 
     async def get_member(self, user_id: int) -> fluxer.GuildMember:
         return await self.guild.fetch_member(user_id)
@@ -106,6 +114,10 @@ class DiscordContext(Context[discord.Bot, discord.Message, discord.Embed, discor
     @property
     def is_bot(self) -> bool:
         return self.author.bot
+
+    @property
+    def message_content(self) -> str:
+        return self.message.content
 
     async def get_member(self, user_id: int) -> discord.Member:
         return await self.guild.fetch_member(user_id)
