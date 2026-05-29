@@ -9,8 +9,10 @@ from .backend.database import Database
 from .interaction import Interactions
 from .backend.cache import CacheStatus
 from . import commands, interactions_impl
-from .commands import command_impl
 from .api_server import app as api_app, ApplicationContext
+from .service.setup import setup
+from .startup import setup_instances
+
 
 def run(config_file: str):
     Config(config_file)
@@ -18,7 +20,7 @@ def run(config_file: str):
     DataReader(Config.instance.data_path)
     CacheStatus()
 
-    bot = fluxer.Bot(command_prefix=Config.instance.prefixes[0], intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
+    bots = setup_instances()
     Interactions()
 
     if Config.instance.use_extras:
@@ -27,11 +29,11 @@ def run(config_file: str):
         from .extras.nothing import no_op_coro as report_bot
 
     async def run_once():
-        starts = [asyncio.Future(), bot.start(Config.instance.token)]
-        ends = [bot.close()]
-        if Config.instance.use_extras:
-            from .extras.tips_service import tip_loop
-            starts.append(tip_loop(bot, lambda: interactions_impl.ready))
+        starts = [asyncio.Future()] + [bot.start() for bot in bots]
+        ends = [bot.close() for bot in bots]
+        #if Config.instance.use_extras:
+        #    from .extras.tips_service import tip_loop
+        #    starts.append(tip_loop(bot, lambda: interactions_impl.ready))
         if Config.instance.api_server.enabled:
             starts.append(api_app.serve())
             ends.append(api_app.close())
@@ -48,8 +50,10 @@ def run(config_file: str):
         err = None
         try:
             asyncio.run(Database.instance.init())
-            command_impl.setup(bot)
-            interactions_impl.setup(bot)
+
+            for bot in bots:
+                setup(bot)
+
             api_app.set_context(ApplicationContext(Database.instance, Config.instance))
             asyncio.run(run_once())
         except KeyboardInterrupt:

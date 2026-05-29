@@ -16,20 +16,20 @@ class Context[Bot, Message, Embed, Attachment, Member, User, Channel, Guild](ABC
     @abstractmethod
     async def reply(self, content: str, embeds: list[Embed], attachments: list[Attachment], **kwargs) -> Message: pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def author(self) -> User: pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def channel(self) -> Channel: pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def guild(self) -> Guild: pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def is_bot(self) -> bool: pass
 
     @abstractmethod

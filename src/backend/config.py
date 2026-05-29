@@ -19,6 +19,13 @@ class WebsiteConfig:
     privacy: str
     contact: str
 
+@dataclass
+class DiscordConfig:
+    token: str
+    server_invite: str
+    server_id: int
+    bot_invite: str
+
 
 class Config:
     instance: Config
@@ -42,6 +49,7 @@ class Config:
     bot_bios: dict[str, str] | None
     api_server: ApiServer | None
     website: WebsiteConfig | None
+    discord: DiscordConfig | None
 
     _fields_map = {
         "token": "token",
@@ -61,7 +69,8 @@ class Config:
         "?client_id": "bot_client_id",
         "?bio": "bot_bios",
         "?api_server": "api_server",
-        "?website": "website"
+        "?website": "website",
+        "?discord": "discord"
     }
 
     def __init__(self, filename: str = "config.json"):
@@ -77,6 +86,8 @@ class Config:
                         setattr(self, v, ApiServer(**conf[k]))
                     elif k == "website":
                         setattr(self, v, WebsiteConfig(**conf[k]))
+                    elif k == "discord":
+                        setattr(self, v, DiscordConfig(**conf[k]))
                     else:
                         setattr(self, v, conf[k])
                 elif not optional:

@@ -1,5 +1,4 @@
 import asyncio
-import time
 
 import fluxer
 from fluxer.models import RawReactionActionEvent
@@ -7,7 +6,7 @@ from fluxer.models import RawReactionActionEvent
 from .interaction import Interactions, message_reactions, remove_reaction
 from .commands import command_list
 from .backend.database import Database
-from .service import Platform
+from .service import Platform, Server
 from .send_proxy import on_user_message, recover_original_message, edit_proxy_message
 from .backend.config import Config
 from .backend.utils import mention_message
@@ -26,14 +25,14 @@ async def show_proxy_info(bot: fluxer.Bot, showing: fluxer.Message) -> fluxer.Em
     return None
 
 
-def setup(bot: fluxer.Bot):
+def setup(server: Server):
     global ready
     ready = False
 
     editing_messages: dict[int, tuple[int, int]] = {} # user_id => (channel_id, message_id)
     handled_messages: dict[int, bool] = {}
 
-    @bot.event
+    @server.event
     async def on_ready():
         global ready
         print(f"Bot is online and ready!")
@@ -44,21 +43,21 @@ def setup(bot: fluxer.Bot):
 
         ready = True
 
-    @bot.event
+    @server.event
     async def on_message(message: fluxer.Message):
         handled_messages[message.id] = True
         await message_wrapper(message)
         handled_messages.pop(message.id)
 
     async def message_wrapper(message: fluxer.Message, editing: bool = False):
-        if message.author.id == bot.user.id: return
+        if message.author.id == server.bot.user.id: return
         if message.author.bot: return
 
         if message.author.id in editing_messages:
             channel_id, message_id = editing_messages.pop(message.author.id)
-            msg = await bot.fetch_message(str(channel_id), str(message_id))
-            await edit_proxy_message(msg, bot, message.content)
-            await message.author.send(f"Message edited: {await mention_message(bot, msg)}")
+            msg = await server.bot.fetch_message(str(channel_id), str(message_id))
+            await edit_proxy_message(msg, server.bot, message.content)
+            await message.author.send(f"Message edited: {await mention_message(server.bot, msg)}")
             return
 
         content = message.content.lower()
@@ -77,21 +76,21 @@ def setup(bot: fluxer.Bot):
                         else:
                             await command_list.registry[cmd, editing](message, alias, prefix)
                         return
-                await response.respond(message, f"`{command}` is not recognized as a valid command! Use `{bot.command_prefix}help` to view all commands!")
+                await response.respond(message, f"`{command}` is not recognized as a valid command! Use `{server.bot.command_prefix}help` to view all commands!")
                 return
 
-        await on_user_message(message, bot)
+        await on_user_message(message, server.bot)
 
 
-    @bot.event
+    @server.event
     async def on_message_edit(message: fluxer.Message):
         if message.id in handled_messages: return
         await message_wrapper(message, True)
 
 
-    @bot.event
+    @server.event
     async def on_raw_reaction_add(event: RawReactionActionEvent):
-        if event.user_id == bot.user.id: return
+        if event.user_id == server.bot.user.id: return
 
         if (event.message_id, event.user_id) not in message_reactions:
             message_reactions[(event.message_id, event.user_id)] = []
@@ -104,12 +103,12 @@ def setup(bot: fluxer.Bot):
         if await Interactions.instance.interact(event.message_id, event.user_id, (event, )):
             return
 
-        usr = await bot.fetch_user(str(event.user_id))
+        usr = await server.bot.fetch_user(str(event.user_id))
         uid = await Database.instance.get_user_id(usr.id, Platform.Fluxer)
 
         if event.emoji.name == "❓":
-            msg = await bot.fetch_message(str(event.channel_id), str(event.message_id))
-            if embed := await show_proxy_info(bot, msg):
+            msg = await server.bot.fetch_message(str(event.channel_id), str(event.message_id))
+            if embed := await show_proxy_info(server.bot, msg):
                 await usr.send("", embeds=[embed])
                 await remove_reaction(msg, event.emoji.name, usr)
         if event.emoji.name == "❌":
@@ -119,13 +118,13 @@ def setup(bot: fluxer.Bot):
                 if proxy.owner == uid:
                     await Database.instance.delete_link_message(event.message_id, event.channel_id)
                     message_reactions.pop((event.message_id, event.user_id))
-                    await bot.delete_message(event.channel_id, event.message_id)
+                    await server.bot.delete_message(event.channel_id, event.message_id)
         if event.emoji.name == "📝":
             proxy_id = (await Database.instance.get_message_link(event.message_id, event.channel_id)).proxy_id
             if proxy_id:
                 proxy = await Database.instance.get_proxy(proxy_id)
                 if proxy.owner == uid:
-                    msg = await bot.fetch_message(str(event.channel_id), str(event.message_id))
+                    msg = await server.bot.fetch_message(str(event.channel_id), str(event.message_id))
                     await remove_reaction(msg, event.emoji.name, usr)
                     await usr.send(f"Editing message:\n```\n{recover_original_message(msg)[1]}\n```")
                     await usr.send("Please enter the new content of the message here:")
@@ -137,17 +136,13 @@ def setup(bot: fluxer.Bot):
         if event.emoji.name == "🔔":
             lnk = await Database.instance.get_message_link(event.message_id, event.channel_id)
             if lnk:
-                msg = await bot.fetch_message(str(event.channel_id), str(event.message_id))
+                msg = await server.bot.fetch_message(str(event.channel_id), str(event.message_id))
                 await remove_reaction(msg, "🔔", event.user_id)
                 await response.respond(msg, f"<@{lnk.platform_user}>, <@{event.user_id}> has pinged you! Use :x: to delete this message (expires in 5 minutes).", user_id_override=lnk.platform_user)
 
-    @bot.event
+    @server.event
     async def on_message_delete(data: dict):
         channel_id, message_id = int(data["channel_id"]), int(data["id"])
         lnk = await Database.instance.get_message_link(message_id, channel_id)
         if lnk:
             await Database.instance.delete_link_message(message_id, channel_id)
-
-
-def clear(bot: fluxer.Bot):
-    bot._event_handlers.clear()
