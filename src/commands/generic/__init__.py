@@ -17,6 +17,8 @@ def make_command(
         description: str,
         arguments: list[Argument]
 ):
+    global command_registry
+
     if isinstance(name, dict):
         n = [*name.keys()][0]
         aliases = name[n]
@@ -26,6 +28,8 @@ def make_command(
 
     command = Command(n, aliases, brief, description, arguments)
     command_registry[n] = command
+
+    command_registry = dict(sorted(command_registry.items(), key=lambda kv: len(kv[0]), reverse=True))
 
 
 def hook_command[Ctx = Context](name: str, platform: Platform | None = None) -> Callable[[CommandCallable[Ctx]], None]:
