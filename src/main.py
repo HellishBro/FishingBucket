@@ -10,8 +10,8 @@ from .interaction import Interactions
 from .backend.cache import CacheStatus
 from . import commands, interactions_impl
 from .api_server import app as api_app, ApplicationContext
-from .service.setup import setup
-from .startup import setup_instances
+from .startup import setup_events, setup_commands, hook_commands
+from .service.server import setup_instances
 
 
 def run(config_file: str):
@@ -20,7 +20,10 @@ def run(config_file: str):
     DataReader(Config.instance.data_path)
     CacheStatus()
 
-    bots = setup_instances()
+    setup_commands.setup()
+    hook_commands.setup()
+
+    servers = setup_instances()
     Interactions()
 
     if Config.instance.use_extras:
@@ -29,8 +32,8 @@ def run(config_file: str):
         from .extras.nothing import no_op_coro as report_bot
 
     async def run_once():
-        starts = [asyncio.Future()] + [bot.start() for bot in bots]
-        ends = [bot.close() for bot in bots]
+        starts = [asyncio.Future()] + [server.start() for server in servers]
+        ends = [server.close() for server in servers]
         #if Config.instance.use_extras:
         #    from .extras.tips_service import tip_loop
         #    starts.append(tip_loop(bot, lambda: interactions_impl.ready))
@@ -51,8 +54,8 @@ def run(config_file: str):
         try:
             asyncio.run(Database.instance.init())
 
-            for bot in bots:
-                setup(bot)
+            for server in servers:
+                setup_events.setup(server)
 
             api_app.set_context(ApplicationContext(Database.instance, Config.instance))
             asyncio.run(run_once())

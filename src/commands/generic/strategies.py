@@ -4,7 +4,7 @@ from typing import Any
 import discord
 import fluxer
 
-from .data import Strategy, CharacterStream, ParseError, ParsingArgument, Strategible
+from .data import Strategy, CharacterStream, ParseError, SyntaxParseError, ParsingArgument, Strategible
 from .misc import lorem_ipsum
 from ...service import Context
 
@@ -45,8 +45,7 @@ class RangeStrategy(Strategy):
 
 class IntegerStrategy(Strategy):
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> int:
-        stream.expect("1234567890-")
-        num = stream.consume()
+        num = stream.expect("1234567890-")
         radix = 10
         alphabet = "1234567890"
         if num == "0" and stream.peek() in "xbo":
@@ -63,7 +62,7 @@ class IntegerStrategy(Strategy):
         try:
             return int(num, radix)
         except ValueError:
-            raise ParseError("cannot parse integer")
+            raise SyntaxParseError("cannot parse integer")
 
     def example(self) -> str:
         return str(random.randint(-100, 100))
@@ -83,7 +82,7 @@ class HexadecimalStrategy(Strategy):
         try:
             return int(num, 16)
         except ValueError:
-            raise ParseError("cannot parse hexadecimal")
+            raise SyntaxParseError("cannot parse hexadecimal")
 
     def example(self) -> str:
         return hex(random.randint(0, 65535))
@@ -94,8 +93,7 @@ class HexadecimalStrategy(Strategy):
 
 class FloatStrategy(Strategy):
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> float:
-        stream.expect("1234567890.-")
-        num = stream.consume()
+        num = stream.expect("1234567890.-")
         while stream.peek() in "1234567890._":
             c = stream.consume()
             if c != "_":
@@ -104,7 +102,7 @@ class FloatStrategy(Strategy):
         try:
             return float(num)
         except ValueError:
-            raise ParseError("cannot parse float")
+            raise SyntaxParseError("cannot parse float")
 
     def example(self) -> str:
         return str(random.random() * 200 - 100)
@@ -136,7 +134,7 @@ class StringStrategy(Strategy):
                 stream.consume()
                 return s
             elif c == "\0":
-                raise ParseError("unterminated string")
+                raise SyntaxParseError("unterminated string")
             else:
                 s += stream.consume()
 
@@ -174,7 +172,7 @@ class BooleanStrategy(Strategy):
             return True
         elif s.lower() in ("no", "not", "nuh", "0", "off", "deny", "neg", "negative", "negate", "false", "f", "n"):
             return False
-        raise ParseError(f"cannot convert {s!r} to boolean")
+        raise SyntaxParseError(f"cannot convert {s!r} to boolean")
 
     def example(self) -> str:
         return random.choice(["true", "false"])
@@ -192,7 +190,7 @@ class OneOf(Strategy):
         for strat in self.strats:
             try:
                 return await strat.parse(stream, argument, context)
-            except ParseError:
+            except SyntaxParseError:
                 stream.pos = start
         raise ParseError(f"none of {len(self.strats)} alternatives matched")
 
@@ -234,10 +232,12 @@ class Optional(Strategy):
         self.default = default
 
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any:
+        start = stream.pos
         if not stream.end:
             try:
                 return await self.strat.parse(stream, argument, context)
-            except ParseError:
+            except SyntaxParseError:
+                stream.pos = start
                 return self.default
         else:
             return self.default
@@ -256,9 +256,11 @@ class List(Strategy):
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> list[Any]:
         l = []
         while not stream.end:
+            start = stream.pos
             try:
                 l.append(await self.datatype.parse(stream, argument, context))
-            except ParseError:
+            except SyntaxParseError:
+                stream.pos = start
                 break
             stream.expect_argument_end()
         return l
@@ -299,8 +301,8 @@ class UserStrategy[User](_UseSnowflakeStrategy):
 
             raise ParseError(f"cannot locate user ID {id_}")
 
-        except ParseError:
-            raise ParseError("could not parse user mention")
+        except SyntaxParseError:
+            raise SyntaxParseError("could not parse user mention")
 
     def example(self) -> str:
         return "@user"
@@ -321,8 +323,8 @@ class ChannelStrategy[Channel](_UseSnowflakeStrategy):
 
             raise ParseError(f"cannot locate channel ID {id_}")
 
-        except ParseError:
-            raise ParseError("could not parse channel mention")
+        except SyntaxParseError:
+            raise SyntaxParseError("could not parse channel mention")
 
     def example(self) -> str:
         return "#channel"
@@ -343,8 +345,8 @@ class RoleStrategy[Role](_UseSnowflakeStrategy):
 
             raise ParseError(f"cannot locate role ID {id_}")
 
-        except ParseError:
-            raise ParseError("could not parse role mention")
+        except SyntaxParseError:
+            raise SyntaxParseError("could not parse role mention")
 
     def example(self) -> str:
         return "@role"

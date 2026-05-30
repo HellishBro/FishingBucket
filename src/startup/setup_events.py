@@ -1,9 +1,22 @@
 import discord
 import fluxer
 
-from .enums import Platform
-from .context import FluxerContext, DiscordContext
-from .server import Server, Fluxer, Discord
+from ..service.enums import Platform
+from ..service.context import FluxerContext, DiscordContext, Context
+from ..service.server import Server, Fluxer, Discord
+from ..backend.config import Config
+from ..commands.generic import get_command_awaitable, ParseError
+
+
+async def handle_message(context: Context):
+    if context.is_bot: return
+
+    try:
+        cmd = await get_command_awaitable(context, Config.instance.prefixes)
+        if cmd:
+            await cmd
+    except ParseError as e:
+        await context.reply(f"Error parsing command: {e.message}.\nUse `fish!help` to see command shape.")
 
 
 def setup(server: Server):
@@ -23,9 +36,12 @@ def setup_fluxer(server: Fluxer):
     async def on_message(message: fluxer.Message):
         context = FluxerContext(Platform.Fluxer, server.bot, message)
         print("Fluxer:", message.content)
+        await handle_message(context)
+
 
 def setup_discord(server: Discord):
     @server.event
     async def on_message(message: discord.Message):
         context = DiscordContext(Platform.Discord, server.bot, message)
         print("Discord:", message.content)
+        await handle_message(context)

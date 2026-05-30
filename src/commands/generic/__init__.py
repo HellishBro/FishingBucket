@@ -2,6 +2,7 @@ import inspect
 from typing import Callable, Coroutine, Any
 
 from .data import Command, Argument, CharacterStream, ParsingArgument, ParseError
+from .strategies import strategize
 from ...service import Context, Platform
 
 type CommandCallable[Ctx] = Callable[[Ctx, ...], Coroutine[Any, Any, Any]]
@@ -51,10 +52,10 @@ async def parse_command_arguments(clean_string: str, arguments: list[Argument], 
     results = []
     for idx, arg in enumerate(arguments):
         try:
-            results.append(await arg.strategy.parse(stream, ParsingArgument(arg, idx, len(arguments) - idx - 1), context))
-            stream.expect_argument_end()
+            results.append(await strategize(arg.strategy).parse(stream, ParsingArgument(arg, idx, len(arguments) - idx - 1), context))
         except ParseError as e:
-            raise ParseError(f"error parsing argument #{idx + 1} {arg.name!r}: {e.message}")
+            raise ParseError(f"error parsing argument #{idx + 1} `{arg.name}`: {e.message}")
+        stream.expect_argument_end()
     return results
 
 

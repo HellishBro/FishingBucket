@@ -27,16 +27,18 @@ class CharacterStream:
 
     def expect_argument_end(self):
         if self.peek() not in ("\0", " "):
-            raise ParseError(f"unexpected character {self.peek()!r}")
+            raise SyntaxParseError(f"unexpected another argument; found fragments of the previous argument")
 
         while self.peek() == " ":
             self.consume()
 
-    def expect(self, *char_alternatives: str):
+    def expect(self, *char_alternatives: str) -> str:
+        c = ""
         for chars in char_alternatives:
             if self.peek() not in chars:
-                raise ParseError(f"unexpected characters {self.peek()!r}")
-            self.consume()
+                raise SyntaxParseError(f"unexpected characters {self.peek()!r}")
+            c += self.consume()
+        return c
 
 
 @dataclass
@@ -90,3 +92,5 @@ class ParseError(Exception):
     def __init__(self, message: str = "error while parsing"):
         super().__init__(message)
         self.message = message
+
+class SyntaxParseError(ParseError): pass

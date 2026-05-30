@@ -66,3 +66,11 @@ class Discord(Server[discord.Bot]):
 
 
 ALL_SERVERS = [Fluxer, Discord]
+
+SERVER_INSTANCES: list[Server] = []
+
+def setup_instances() -> list[Server]:
+    for server in ALL_SERVERS:
+        SERVER_INSTANCES.append(server())
+
+    return SERVER_INSTANCES

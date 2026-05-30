@@ -14,7 +14,7 @@ class Context[Bot, Message, Embed, Attachment, Member, User, Channel, Guild, Rol
         self.message = message
 
     @abstractmethod
-    async def reply(self, content: str, embeds: list[Embed], attachments: list[Attachment], **kwargs) -> Message: pass
+    async def reply(self, content: str, embeds: list[Embed] = None, attachments: list[Attachment] = None, **kwargs) -> Message: pass
 
     @property
     @abstractmethod
@@ -59,7 +59,7 @@ class FluxerContext(Context[fluxer.Bot, fluxer.Message, fluxer.Embed, fluxer.Fil
             return {"pop": True}
         return None
 
-    async def reply(self, content: str, embeds: list[fluxer.Embed], attachments: list[fluxer.File], **kwargs) -> fluxer.Message:
+    async def reply(self, content: str, embeds: list[fluxer.Embed] = None, attachments: list[fluxer.File] = None, **kwargs) -> fluxer.Message:
         try:
             msg = await self.message.reply(content, embeds=embeds, files=attachments, **kwargs)
         except fluxer.errors.NotFound:
@@ -123,7 +123,7 @@ class DiscordContext(Context[discord.Bot, discord.Message, discord.Embed, discor
             return {"pop": True}
         return None
 
-    async def reply(self, content: str, embeds: list[discord.Embed], attachments: list[discord.File], **kwargs) -> discord.Message:
+    async def reply(self, content: str, embeds: list[discord.Embed] = None, attachments: list[discord.File] = None, **kwargs) -> discord.Message:
         try:
             msg = await self.message.reply(content, embeds=embeds, files=attachments, **kwargs)
         except discord.errors.NotFound:
