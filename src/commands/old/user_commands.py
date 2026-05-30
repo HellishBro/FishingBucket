@@ -1,13 +1,13 @@
 import fluxer
 from fluxer.models import RawReactionActionEvent
 
-from . import register_group, register_command
+from src.commands import register_group, register_command
 from .utils import get_uid
-from .. import response
-from ..backend.database import Database
-from ..service import Platform
-from ..backend.models import alternative, one_or_more
-from ..interaction import Interactions, Interaction, remove_reaction
+from src import response
+from src.backend.database import Database
+from src.service import Platform
+from src.backend.models import alternative, one_or_more
+from src.interaction import Interactions, Interaction, remove_reaction
 
 def setup(bot: fluxer.Bot):
     register_group("user", "User Commands", "Miscellaneous commands related to account, user, and privacy settings.")

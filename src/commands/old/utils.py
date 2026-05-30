@@ -4,14 +4,14 @@ import fluxer
 from fluxer.models import RawReactionActionEvent
 from textdistance import damerau_levenshtein
 
-from ..backend.config import Config
-from ..interaction import Interaction, Interactions, remove_reaction
-from .. import response
-from ..backend.database import Database, UserPreference
-from ..service import Platform
-from ..backend.models import Proxy, ProxyGroup, string_with_length
-from ..backend.template_utils import Template, TextPart, ExprPart
-from ..backend.utils import format_date, get_member, compute_permissions, normalize_emojis
+from src.backend.config import Config
+from src.interaction import Interaction, Interactions, remove_reaction
+from src import response
+from src.backend.database import Database, UserPreference
+from src.service import Platform
+from src.backend.models import Proxy, ProxyGroup, string_with_length
+from src.backend.template_utils import Template, TextPart, ExprPart
+from src.backend.utils import format_date, get_member, compute_permissions, normalize_emojis
 
 bot: fluxer.Bot = None
 proxy_username = string_with_length(50)

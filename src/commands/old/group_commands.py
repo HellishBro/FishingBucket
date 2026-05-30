@@ -4,12 +4,12 @@ from fluxer.models import RawReactionActionEvent
 
 from .utils import proxy_username, ensure_own_proxy, paged_group_list, ensure_own_group, paged_proxy_list, \
     valid_template, get_group_text, get_uid
-from .. import response
-from ..backend.database import Database
-from ..commands import register_command, register_group
-from ..interaction import Interaction, remove_reaction, Interactions
-from ..backend.models import optional_type, one_or_more, ProxyGroup, Proxy
-from ..backend.utils import get_guild_id_from_channel, normalize_emojis
+from src import response
+from src.backend.database import Database
+from src.commands import register_command, register_group
+from src.interaction import Interaction, remove_reaction, Interactions
+from src.backend.models import optional_type, one_or_more, ProxyGroup, Proxy
+from src.backend.utils import get_guild_id_from_channel, normalize_emojis
 
 
 def setup(bot: fluxer.Bot):

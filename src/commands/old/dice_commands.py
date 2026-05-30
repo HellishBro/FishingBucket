@@ -8,13 +8,13 @@ from expr_dice_roller.lexer import Lexer
 from expr_dice_roller.evaluator import EvalFunc
 
 from .utils import require_permission
-from .. import response
-from ..backend.database import Database, Guild
-from ..service import Platform
-from ..backend.dice_environments import global_functions
-from ..backend.models import alternative, optional_type
-from . import register_command, register_group
-from ..backend.utils import roll_dice
+from src import response
+from src.backend.database import Database, Guild
+from src.service import Platform
+from src.backend.dice_environments import global_functions
+from src.backend.models import alternative, optional_type
+from src.commands import register_command, register_group
+from src.backend.utils import roll_dice
 
 start_time = datetime.now()
 

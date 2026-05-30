@@ -35,7 +35,6 @@ def setup_fluxer(server: Fluxer):
     @server.event
     async def on_message(message: fluxer.Message):
         context = FluxerContext(Platform.Fluxer, server.bot, message)
-        print("Fluxer:", message.content)
         await handle_message(context)
 
 
@@ -43,5 +42,4 @@ def setup_discord(server: Discord):
     @server.event
     async def on_message(message: discord.Message):
         context = DiscordContext(Platform.Discord, server.bot, message)
-        print("Discord:", message.content)
         await handle_message(context)

@@ -7,6 +7,9 @@ from .enums import Platform
 from ..interaction import Interactions, Interaction
 
 
+type IntersectionContext = FluxerContext | DiscordContext
+
+
 class Context[Bot, Message, Embed, Attachment, Member, User, Channel, Guild, Role](ABC):
     def __init__(self, platform: Platform, bot: Bot, message: Message):
         self.platform = platform
@@ -50,6 +53,9 @@ class Context[Bot, Message, Embed, Attachment, Member, User, Channel, Guild, Rol
 
     @abstractmethod
     async def get_roles(self) -> list[Role]: pass
+
+    @abstractmethod
+    def Embed(self, title: str, description: str, **kwargs) -> Embed: pass
 
 
 class FluxerContext(Context[fluxer.Bot, fluxer.Message, fluxer.Embed, fluxer.File, fluxer.GuildMember, fluxer.User, fluxer.Channel, fluxer.Guild, fluxer.Role]):
@@ -114,6 +120,9 @@ class FluxerContext(Context[fluxer.Bot, fluxer.Message, fluxer.Embed, fluxer.Fil
 
     async def get_roles(self) -> list[fluxer.Role]:
         return await self.guild.fetch_roles()
+
+    def Embed(self, title: str, description: str, **kwargs) -> fluxer.Embed:
+        return fluxer.Embed(title, description, **kwargs)
 
 
 class DiscordContext(Context[discord.Bot, discord.Message, discord.Embed, discord.File, discord.Member, discord.User, discord.TextChannel | discord.DMChannel, discord.Guild, discord.Role]):
@@ -180,3 +189,6 @@ class DiscordContext(Context[discord.Bot, discord.Message, discord.Embed, discor
 
     async def get_roles(self) -> list[discord.Role]:
         return await self.guild.fetch_roles()
+
+    def Embed(self, title: str, description: str, **kwargs) -> discord.Embed:
+        return discord.Embed(title=title, description=description, **kwargs)

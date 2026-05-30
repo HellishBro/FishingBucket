@@ -4,15 +4,15 @@ from textdistance import damerau_levenshtein
 
 from .utils import proxy_username, paged_proxy_list, ensure_own_proxy, get_proxies_text, require_reply, valid_template, \
     example_trigger_text, get_uid
-from .. import response
-from ..backend.database import Database, Guild
-from ..service import Platform
-from ..commands import register_command, register_group
-from ..interaction import Interactions
-from ..interactions_impl import show_proxy_info
-from ..backend.models import optional_type, Proxy, alternative
-from ..send_proxy import reproxy as proxy_reproxy, edit_proxy_message
-from ..backend.utils import get_guild_id_from_channel, normalize_emojis, edit_webhook
+from src import response
+from src.backend.database import Database, Guild
+from src.service import Platform
+from src.commands import register_command, register_group
+from src.interaction import Interactions
+from src.interactions_impl import show_proxy_info
+from src.backend.models import optional_type, Proxy, alternative
+from src.send_proxy import reproxy as proxy_reproxy, edit_proxy_message
+from src.backend.utils import get_guild_id_from_channel, normalize_emojis, edit_webhook
 
 
 def setup(bot: fluxer.Bot):

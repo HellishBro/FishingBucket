@@ -2,12 +2,12 @@ import fluxer
 from fluxer.models import RawReactionActionEvent
 
 from .utils import proxy_username, ensure_own_proxy, valid_template, example_trigger_text, get_uid
-from .. import response
-from ..backend.database import Database
-from ..backend.utils import normalize_emojis
-from ..commands import register_command, register_group
-from ..interaction import Interaction, remove_reaction, Interactions
-from ..backend.models import optional_type, one_or_more, Proxy, alternative
+from src import response
+from src.backend.database import Database
+from src.backend.utils import normalize_emojis
+from src.commands import register_command, register_group
+from src.interaction import Interaction, remove_reaction, Interactions
+from src.backend.models import optional_type, one_or_more, Proxy, alternative
 
 
 def setup(bot: fluxer.Bot):

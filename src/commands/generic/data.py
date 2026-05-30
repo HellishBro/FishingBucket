@@ -50,6 +50,8 @@ class ParsingArgument:
 
 class Strategy(ABC):
     accept_end_of_stream = False
+    bracket_start = "<"
+    bracket_end = ">"
 
     @abstractmethod
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any: pass
@@ -89,6 +91,27 @@ class Command:
     description: str
     arguments: list[Argument]
 
+    def get_example_invocation(self) -> str:
+        parts = [self.canonical_name]
+
+        for argument in self.arguments:
+            parts.append(argument.get_example())
+
+        return " ".join(parts).replace("  ", " ")
+
+
+    def get_usage(self, strategize: Callable[[Strategible], Strategy]) -> str:
+        parts = [self.canonical_name]
+
+        for argument in self.arguments:
+            strat = strategize(argument.strategy)
+            placeholder = strat.get_placeholder_text().replace("  ", " ")
+            part = f"{strat.bracket_start}{argument.name}: {placeholder}{strat.bracket_end}"
+            parts.append(part)
+
+        return " ".join(parts)
+
+
 
 class ParseError(Exception):
     def __init__(self, message: str = "error while parsing"):
@@ -96,3 +119,14 @@ class ParseError(Exception):
         self.message = message
 
 class SyntaxParseError(ParseError): pass
+
+
+@dataclass
+class CommandGroup:
+    canonical_name: str
+    brief: str
+    description: str
+    commands: list[str]
+
+    def append(self, command: str):
+        self.commands.append(command)

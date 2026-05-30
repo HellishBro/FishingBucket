@@ -202,7 +202,7 @@ class OneOf(Strategy):
 
 
 class OptionList(Strategy):
-    def __init__(self, options: dict[str, list[str]] | list[str]):
+    def __init__(self, options_name: str | None, options: dict[str, list[str]] | list[str], fatal = False):
         if isinstance(options, dict):
             self.options = {
                 k.lower(): [i.lower() for i in v] for k, v in options.items()
@@ -212,22 +212,27 @@ class OptionList(Strategy):
                 k.lower(): [] for k in options
             }
 
+        self.options_name = options_name
+        self.fatal = fatal
+
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> str:
         s = await StringStrategy().parse(stream, argument, context)
         for k, v in self.options.items():
             if s.lower() in [k] + v:
                 return k
-        raise ParseError(f"none of {len(self.options)} options matched")
+        raise [ParseError, SyntaxParseError][int(self.fatal)](f"none of {len(self.options)} options matched")
 
     def example(self) -> str:
         return random.choice([*self.options.keys()])
 
     def get_placeholder_text(self) -> str:
-        return " OR ".join([*self.options.keys()])
+        return self.options_name or "options"
 
 
 class Optional(Strategy):
     accept_end_of_stream = True
+    bracket_start = "["
+    bracket_end = "]"
 
     def __init__(self, strat: Strategible, default: Any):
         self.strat = strategize(strat)
@@ -248,7 +253,7 @@ class Optional(Strategy):
         return random.choice([self.strat.example(), ""])
 
     def get_placeholder_text(self) -> str:
-        return "[" + self.strat.get_placeholder_text() + "]"
+        return self.strat.get_placeholder_text()
 
 
 class List(Strategy):

@@ -1,6 +1,6 @@
 import fluxer
-from . import utils
-from .. import response
+from src.commands.old import utils
+from src import response
 
 def setup(bot: fluxer.Bot):
     response.set_consts(bot)

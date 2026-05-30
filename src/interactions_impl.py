@@ -4,7 +4,7 @@ import fluxer
 from fluxer.models import RawReactionActionEvent
 
 from .interaction import Interactions, message_reactions, remove_reaction
-from .commands import command_list
+#from src.commands import command_list
 from .backend.database import Database
 from .service import Platform, Server
 from .send_proxy import on_user_message, recover_original_message, edit_proxy_message

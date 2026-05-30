@@ -7,12 +7,12 @@ from io import BytesIO
 import fluxer
 
 from .utils import get_uid
-from .. import response
-from ..backend.database import Database
-from ..commands import register_command, register_group
-from ..import_helper import import_tupperbox, import_native, import_pluralkit, export_native, import_utter
-from ..backend.models import optional_type
-from ..backend.utils import read_file
+from src import response
+from src.backend.database import Database
+from src.commands import register_command, register_group
+from src.import_helper import import_tupperbox, import_native, import_pluralkit, export_native, import_utter
+from src.backend.models import optional_type
+from src.backend.utils import read_file
 
 def setup(bot: fluxer.Bot):
     register_group("io", "Import/Export Commands", "Save or load your proxies.")

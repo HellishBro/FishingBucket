@@ -10,7 +10,7 @@ from .interaction import Interactions
 from .backend.cache import CacheStatus
 from . import commands, interactions_impl
 from .api_server import app as api_app, ApplicationContext
-from .startup import setup_events, setup_commands, hook_commands
+from .startup import setup_events, setup_commands
 from .service.server import setup_instances
 
 
@@ -21,7 +21,7 @@ def run(config_file: str):
     CacheStatus()
 
     setup_commands.setup()
-    hook_commands.setup()
+    commands.setup()
 
     servers = setup_instances()
     Interactions()

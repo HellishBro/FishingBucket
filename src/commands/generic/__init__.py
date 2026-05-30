@@ -1,7 +1,7 @@
 import inspect
 from typing import Callable, Coroutine, Any
 
-from .data import Command, Argument, CharacterStream, ParsingArgument, ParseError
+from .data import Command, Argument, CharacterStream, ParsingArgument, ParseError, CommandGroup
 from .strategies import strategize
 from ...service import Context, Platform
 
@@ -9,6 +9,7 @@ type CommandCallable[Ctx] = Callable[[Ctx, ...], Coroutine[Any, Any, Any]]
 
 command_registry: dict[str, Command] = {}
 command_hooks: dict[tuple[str, Platform], CommandCallable[Context]] = {}
+command_groups: dict[str, CommandGroup] = {}
 
 
 def make_command(
@@ -32,6 +33,24 @@ def make_command(
     command_registry = dict(sorted(command_registry.items(), key=lambda kv: len(kv[0]), reverse=True))
 
     return n
+
+
+def make_command_group(
+        identifier: str,
+        brief: str,
+        description: str
+) -> CommandGroup:
+    group = CommandGroup(identifier, brief, description, [])
+    command_groups[identifier] = group
+    return group
+
+
+def get_commands() -> dict[str, Command]:
+    return command_registry
+
+
+def get_command_groups() -> dict[str, CommandGroup]:
+    return command_groups
 
 
 def hook_command[Ctx = Context](name: str, platform: Platform | None = None) -> Callable[[CommandCallable[Ctx]], None]:

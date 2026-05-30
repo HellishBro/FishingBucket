@@ -1,12 +1,12 @@
 import fluxer
 
 from .utils import require_permission
-from .. import response
-from ..backend.config import Config
-from ..backend.database import Database, Guild
-from ..service import Platform
-from ..commands import register_command, register_group
-from ..backend.models import alternative, one_or_more
+from src import response
+from src.backend.config import Config
+from src.backend.database import Database, Guild
+from src.service import Platform
+from src.commands import register_command, register_group
+from src.backend.models import alternative, one_or_more
 
 def setup(bot: fluxer.Bot):
     register_group("guild", "Community Commands", f"Commands that changes how {Config.instance.name} functions in your community.")

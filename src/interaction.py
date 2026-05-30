@@ -2,7 +2,7 @@ import time
 from asyncio import sleep
 import fluxer
 
-from .commands import pop_cooldown
+#from src.commands import pop_cooldown
 
 class Interaction:
     def __init__(self, author: int, callback, expire_after = 5 * 60):
