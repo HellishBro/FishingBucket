@@ -14,5 +14,6 @@ dependencies = [
     "uvicorn>=0.46.0",
     "pydantic",
     "py-cord>=2.8.0",
-    "ipsum"
+    "ipsum",
+    "lorem-text>=3.0",
 ]

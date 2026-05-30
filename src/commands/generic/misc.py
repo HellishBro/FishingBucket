@@ -1,19 +1,11 @@
-from functools import cache
 from typing import Literal, Callable
 
-import ipsum
-
-
-@cache
-def get_ipsum_model(language: str) -> ipsum.LanguageModel:
-    return ipsum.load_model(language)
-
+from lorem_text import lorem
 
 def lorem_ipsum(length: Literal["SHORT"] | Literal["MEDIUM"] | Literal["LONG"]) -> Callable[[], str]:
-    model = get_ipsum_model("en")
     if length == "SHORT":
-        return lambda: " ".join(model.generate_words(10))
+        return lambda: lorem.words(10)
     elif length == "MEDIUM":
-        return lambda: model.generate_sentences(1)[0]
+        return lambda: lorem.sentence()
     else:
-        return lambda: model.generate_paragraphs(1)[0]
+        return lambda: lorem.paragraph()
