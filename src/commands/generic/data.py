@@ -1,6 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Any
+from typing import Callable, Any, Literal
+
+import discord
+import fluxer
+
+from ...service import Context
 
 
 class CharacterStream:
@@ -27,6 +32,12 @@ class CharacterStream:
         while self.peek() == " ":
             self.consume()
 
+    def expect(self, *char_alternatives: str):
+        for chars in char_alternatives:
+            if self.peek() not in chars:
+                raise ParseError(f"unexpected characters {self.peek()!r}")
+            self.consume()
+
 
 @dataclass
 class ParsingArgument:
@@ -37,7 +48,7 @@ class ParsingArgument:
 
 class Strategy(ABC):
     @abstractmethod
-    def parse(self, stream: CharacterStream, argument: ParsingArgument) -> Any: pass
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any: pass
 
     @abstractmethod
     def example(self) -> str: pass
@@ -49,7 +60,10 @@ class Strategy(ABC):
 type Strategible = (
     Strategy |
     type[int] | type[float] | type[str] | type[bool] |
-    range
+    range |
+    Literal[hex] |
+    fluxer.User | fluxer.Channel | fluxer.Role |
+    discord.User | discord.TextChannel | discord.Role
 )
 
 

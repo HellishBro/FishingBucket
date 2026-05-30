@@ -1,8 +1,12 @@
 import random
 from typing import Any
 
+import discord
+import fluxer
+
 from .data import Strategy, CharacterStream, ParseError, ParsingArgument, Strategible
 from .misc import lorem_ipsum
+from ...service import Context
 
 
 def strategize(strategy: Strategible) -> Strategy:
@@ -12,6 +16,13 @@ def strategize(strategy: Strategible) -> Strategy:
     elif strategy == float: return FloatStrategy()
     elif strategy == str: return StringStrategy()
     elif strategy == bool: return BooleanStrategy()
+    elif strategy == hex: return HexadecimalStrategy()
+    elif strategy == fluxer.User: return UserStrategy[fluxer.User]()
+    elif strategy == fluxer.Channel: return ChannelStrategy[fluxer.Channel]()
+    elif strategy == fluxer.Role: return RoleStrategy[fluxer.Role]()
+    elif strategy == discord.User: return UserStrategy[discord.User]()
+    elif strategy == discord.Channel: return ChannelStrategy[discord.Channel]()
+    elif strategy == discord.Role: return RoleStrategy[discord.Role]()
     raise NotImplementedError # should be unreachable
 
 
@@ -19,8 +30,8 @@ class RangeStrategy(Strategy):
     def __init__(self, r: range):
         self.range = r
 
-    def parse(self, stream: CharacterStream, argument: ParsingArgument) -> int:
-        num = IntegerStrategy().parse(stream, argument)
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> int:
+        num = await IntegerStrategy().parse(stream, argument, context)
         if num in self.range:
             return num
         raise ParseError(f"{num} is out of range {self.get_placeholder_text()}")
@@ -33,15 +44,14 @@ class RangeStrategy(Strategy):
 
 
 class IntegerStrategy(Strategy):
-    def parse(self, stream: CharacterStream, argument: ParsingArgument) -> int:
-        if stream.peek() not in "1234567890-":
-            raise ParseError()
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> int:
+        stream.expect("1234567890-")
         num = stream.consume()
         radix = 10
         alphabet = "1234567890"
         if num == "0" and stream.peek() in "xbo":
             radix, alphabet = {
-                "x": (16, "1234567890abcdef"),
+                "x": (16, "1234567890abcdefABCDEF"),
                 "b": (2, "01"),
                 "o": (8, "01234567")
             }[stream.consume()]
@@ -62,10 +72,29 @@ class IntegerStrategy(Strategy):
         return "integer"
 
 
+class HexadecimalStrategy(Strategy):
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> int:
+        stream.expect(*"0x")
+        alphabet = "1234567890abcdef"
+        num = ""
+        while stream.peek() in alphabet + "_":
+            num += stream.consume()
+        num = num.replace("_", "")
+        try:
+            return int(num, 16)
+        except ValueError:
+            raise ParseError("cannot parse hexadecimal")
+
+    def example(self) -> str:
+        return hex(random.randint(0, 65535))
+
+    def get_placeholder_text(self) -> str:
+        return "hexadecimal"
+
+
 class FloatStrategy(Strategy):
-    def parse(self, stream: CharacterStream, argument: ParsingArgument) -> float:
-        if stream.peek() not in "1234567890.-":
-            raise ParseError()
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> float:
+        stream.expect("1234567890.-")
         num = stream.consume()
         while stream.peek() in "1234567890._":
             c = stream.consume()
@@ -85,7 +114,7 @@ class FloatStrategy(Strategy):
 
 
 class StringStrategy(Strategy):
-    def parse(self, stream: CharacterStream, argument: ParsingArgument) -> str:
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> str:
         quote: None | str = None
         if stream.peek() in "'\"":
             quote = stream.consume()
@@ -112,15 +141,35 @@ class StringStrategy(Strategy):
                 s += stream.consume()
 
     def example(self) -> str:
-        return lorem_ipsum("SHORT")()
+        return repr(lorem_ipsum("SHORT")())
 
     def get_placeholder_text(self) -> str:
         return "string"
 
 
+class WordStrategy(Strategy):
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> str:
+        s = ""
+        while True:
+            c = stream.peek()
+            if c == "\\":
+                stream.consume()
+                s += stream.consume()
+            elif c in (" ", "\0"):
+                return s
+            else:
+                s += stream.consume()
+
+    def example(self) -> str:
+        return lorem_ipsum("MINI")()
+
+    def get_placeholder_text(self) -> str:
+        return "word"
+
+
 class BooleanStrategy(Strategy):
-    def parse(self, stream: CharacterStream, argument: ParsingArgument) -> bool:
-        s = StringStrategy().parse(stream, argument)
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> bool:
+        s = await WordStrategy().parse(stream, argument, context)
         if s.lower() in ("yes", "yea", "yeah", "yep", "yuh", "1", "on", "affirm", "affirmative", "true", "t", "y"):
             return True
         elif s.lower() in ("no", "not", "nuh", "0", "off", "deny", "neg", "negative", "negate", "false", "f", "n"):
@@ -138,11 +187,11 @@ class OneOf(Strategy):
     def __init__(self, *strats: Strategible):
         self.strats = [strategize(strat) for strat in strats]
 
-    def parse(self, stream: CharacterStream, argument: ParsingArgument) -> Any:
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any:
         start = stream.pos
         for strat in self.strats:
             try:
-                return strat.parse(stream, argument)
+                return await strat.parse(stream, argument, context)
             except ParseError:
                 stream.pos = start
         raise ParseError(f"none of {len(self.strats)} alternatives matched")
@@ -165,8 +214,8 @@ class OptionList(Strategy):
                 k.lower(): [] for k in options
             }
 
-    def parse(self, stream: CharacterStream, argument: ParsingArgument) -> str:
-        s = StringStrategy().parse(stream, argument)
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> str:
+        s = await StringStrategy().parse(stream, argument, context)
         for k, v in self.options.items():
             if s.lower() in [k] + v:
                 return k
@@ -184,10 +233,10 @@ class Optional(Strategy):
         self.strat = strategize(strat)
         self.default = default
 
-    def parse(self, stream: CharacterStream, argument: ParsingArgument) -> Any:
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any:
         if not stream.end:
             try:
-                return self.strat.parse(stream, argument)
+                return await self.strat.parse(stream, argument, context)
             except ParseError:
                 return self.default
         else:
@@ -198,3 +247,107 @@ class Optional(Strategy):
 
     def get_placeholder_text(self) -> str:
         return "[" + self.strat.get_placeholder_text() + "]"
+
+
+class List(Strategy):
+    def __init__(self, datatype: Strategible):
+        self.datatype = strategize(datatype)
+
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> list[Any]:
+        l = []
+        while not stream.end:
+            try:
+                l.append(await self.datatype.parse(stream, argument, context))
+            except ParseError:
+                break
+            stream.expect_argument_end()
+        return l
+
+    def example(self) -> str:
+        return " ".join(self.datatype.example() for _ in range(random.randint(0, 3)))
+
+    def get_placeholder_text(self) -> str:
+        return self.datatype.get_placeholder_text() + "(s)"
+
+
+class _UseSnowflakeStrategy(Strategy):
+    prefix: str
+
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> int:
+        stream.expect("<")
+        stream.expect(*self.prefix)
+        id_ = await IntegerStrategy().parse(stream, argument, context)
+        stream.expect(">")
+        return id_
+
+    def example(self) -> str:
+        return f"<{self.prefix}...>"
+
+    def get_placeholder_text(self) -> str:
+        return "snowflake"
+
+
+class UserStrategy[User](_UseSnowflakeStrategy):
+    prefix = "@"
+
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> User:
+        try:
+            id_ = await super().parse(stream, argument, context)
+            user = await context.get_user(id_)
+            if user is not None:
+                return user
+
+            raise ParseError(f"cannot locate user ID {id_}")
+
+        except ParseError:
+            raise ParseError("could not parse user mention")
+
+    def example(self) -> str:
+        return "@user"
+
+    def get_placeholder_text(self) -> str:
+        return "@user"
+
+
+class ChannelStrategy[Channel](_UseSnowflakeStrategy):
+    prefix = "#"
+
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> CharacterStream:
+        try:
+            id_ = await super().parse(stream, argument, context)
+            channel = await context.get_channel(id_)
+            if channel is not None:
+                return channel
+
+            raise ParseError(f"cannot locate channel ID {id_}")
+
+        except ParseError:
+            raise ParseError("could not parse channel mention")
+
+    def example(self) -> str:
+        return "#channel"
+
+    def get_placeholder_text(self) -> str:
+        return "#channel"
+
+
+class RoleStrategy[Role](_UseSnowflakeStrategy):
+    prefix = "@&"
+
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Role:
+        try:
+            id_ = await super().parse(stream, argument, context)
+            role = await context.get_role(id_)
+            if role is not None:
+                return role
+
+            raise ParseError(f"cannot locate role ID {id_}")
+
+        except ParseError:
+            raise ParseError("could not parse role mention")
+
+    def example(self) -> str:
+        return "@role"
+
+    def get_placeholder_text(self) -> str:
+        return "@role"

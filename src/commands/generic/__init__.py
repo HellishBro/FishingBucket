@@ -46,24 +46,24 @@ def hook_command[Ctx = Context](name: str, platform: Platform | None = None) -> 
     return wrap
 
 
-def parse_command_arguments(clean_string: str, arguments: list[Argument]) -> list[Any]:
+async def parse_command_arguments(clean_string: str, arguments: list[Argument], context: Context) -> list[Any]:
     stream = CharacterStream(clean_string)
     results = []
     for idx, arg in enumerate(arguments):
         try:
-            results.append(arg.strategy.parse(stream, ParsingArgument(arg, idx, len(arguments) - idx - 1)))
+            results.append(await arg.strategy.parse(stream, ParsingArgument(arg, idx, len(arguments) - idx - 1), context))
             stream.expect_argument_end()
         except ParseError as e:
             raise ParseError(f"error parsing argument #{idx + 1} {arg.name!r}: {e.message}")
     return results
 
 
-def get_command_awaitable(context: Context, prefixes: list[str]) -> Coroutine[Any, Any, Any] | None:
+async def get_command_awaitable(context: Context, prefixes: list[str]) -> Coroutine[Any, Any, Any] | None:
     for prefix in prefixes:
         if context.message_content.startswith(prefix):
             sans_prefix = context.message_content[len(prefix):].strip()
             for name, command in command_registry.items():
                 if any(sans_prefix.lower().startswith((matched_name := n).lower()) for n in [command.canonical_name] + command.aliases):
-                    arguments = parse_command_arguments(sans_prefix[len(matched_name):].strip(), command.arguments)
+                    arguments = await parse_command_arguments(sans_prefix[len(matched_name):].strip(), command.arguments, context)
                     return command_hooks[name, context.platform](context, *arguments)
     return None

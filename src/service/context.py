@@ -7,7 +7,7 @@ from .enums import Platform
 from ..interaction import Interactions, Interaction
 
 
-class Context[Bot, Message, Embed, Attachment, Member, User, Channel, Guild](ABC):
+class Context[Bot, Message, Embed, Attachment, Member, User, Channel, Guild, Role](ABC):
     def __init__(self, platform: Platform, bot: Bot, message: Message):
         self.platform = platform
         self.bot = bot
@@ -37,10 +37,22 @@ class Context[Bot, Message, Embed, Attachment, Member, User, Channel, Guild](ABC
     def message_content(self) -> str: pass
 
     @abstractmethod
-    async def get_member(self, user_id: int) -> Member: pass
+    async def get_member(self, user_id: int) -> Member | None: pass
+
+    @abstractmethod
+    async def get_user(self, user_id: int) -> User | None: pass
+
+    @abstractmethod
+    async def get_channel(self, channel_id: int) -> Channel | None: pass
+
+    @abstractmethod
+    async def get_role(self, role_id: int) -> Role | None: pass
+
+    @abstractmethod
+    async def get_roles(self) -> list[Role]: pass
 
 
-class FluxerContext(Context[fluxer.Bot, fluxer.Message, fluxer.Embed, fluxer.File, fluxer.GuildMember, fluxer.User, fluxer.Channel, fluxer.Guild]):
+class FluxerContext(Context[fluxer.Bot, fluxer.Message, fluxer.Embed, fluxer.File, fluxer.GuildMember, fluxer.User, fluxer.Channel, fluxer.Guild, fluxer.Role]):
     async def interact_to_delete(self, event: fluxer.models.RawReactionActionEvent):
         if event.emoji.name == "❌":
             await self.bot.delete_message(event.channel_id, event.message_id)
@@ -77,11 +89,34 @@ class FluxerContext(Context[fluxer.Bot, fluxer.Message, fluxer.Embed, fluxer.Fil
     def message_content(self) -> str:
         return self.message.content
 
-    async def get_member(self, user_id: int) -> fluxer.GuildMember:
-        return await self.guild.fetch_member(user_id)
+    async def get_member(self, user_id: int) -> fluxer.GuildMember | None:
+        try:
+            return await self.guild.fetch_member(user_id)
+        except fluxer.errors.NotFound:
+            return None
+
+    async def get_user(self, user_id: int) -> fluxer.User | None:
+        try:
+            return await self.bot.fetch_user(str(user_id))
+        except fluxer.errors.NotFound:
+            return None
+
+    async def get_channel(self, channel_id: int) -> fluxer.Channel | None:
+        try:
+            return await self.bot.fetch_channel(str(channel_id))
+        except fluxer.errors.NotFound:
+            return None
+
+    async def get_role(self, role_id: int) -> fluxer.Role | None:
+        roles = await self.get_roles()
+        appropriate_roles = [role for role in roles if role.id == role_id]
+        return appropriate_roles[0] if appropriate_roles else None
+
+    async def get_roles(self) -> list[fluxer.Role]:
+        return await self.guild.fetch_roles()
 
 
-class DiscordContext(Context[discord.Bot, discord.Message, discord.Embed, discord.File, discord.Member, discord.User, discord.TextChannel | discord.DMChannel, discord.Guild]):
+class DiscordContext(Context[discord.Bot, discord.Message, discord.Embed, discord.File, discord.Member, discord.User, discord.TextChannel | discord.DMChannel, discord.Guild, discord.Role]):
     async def interact_to_delete(self, event: discord.RawReactionActionEvent):
         if event.emoji.name == "❌":
             await (await (await self.bot.fetch_channel(event.channel_id)).fetch_message(event.message_id)).delete()
@@ -119,5 +154,29 @@ class DiscordContext(Context[discord.Bot, discord.Message, discord.Embed, discor
     def message_content(self) -> str:
         return self.message.content
 
-    async def get_member(self, user_id: int) -> discord.Member:
-        return await self.guild.fetch_member(user_id)
+    async def get_member(self, user_id: int) -> discord.Member | None:
+        try:
+            return await self.guild.fetch_member(user_id)
+        except discord.HTTPException:
+            return None
+
+    async def get_user(self, user_id: int) -> discord.User | None:
+        try:
+            return await self.bot.fetch_user(user_id)
+        except discord.HTTPException:
+            return None
+
+    async def get_channel(self, channel_id: int) -> discord.TextChannel | None:
+        try:
+            return await self.guild.fetch_channel(channel_id)
+        except discord.HTTPException:
+            return None
+
+    async def get_role(self, role_id: int) -> discord.Role | None:
+        try:
+            return await self.guild.fetch_role(role_id)
+        except discord.HTTPException:
+            return None
+
+    async def get_roles(self) -> list[discord.Role]:
+        return await self.guild.fetch_roles()
