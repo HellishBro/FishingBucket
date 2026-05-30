@@ -227,6 +227,8 @@ class OptionList(Strategy):
 
 
 class Optional(Strategy):
+    accept_end_of_stream = True
+
     def __init__(self, strat: Strategible, default: Any):
         self.strat = strategize(strat)
         self.default = default
@@ -250,6 +252,8 @@ class Optional(Strategy):
 
 
 class List(Strategy):
+    accept_end_of_stream = True
+
     def __init__(self, datatype: Strategible):
         self.datatype = strategize(datatype)
 

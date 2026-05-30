@@ -16,22 +16,23 @@ def setup():
         [
             Argument(
                 "page or concept",
-                Optional(
-                    OneOf(
-                        range(0, 4),
-                        OptionList({
-                            "help": [
-                                "h"
-                            ],
-                            "commands": [
-                                "cmd",
-                                "cmds",
-                                "command"
-                            ]
-                        })
-                    ),
-                    0
+                OneOf(
+                    range(0, 4),
+                    OptionList({
+                        "help": [
+                            "h"
+                        ],
+                        "commands": [
+                            "cmd",
+                            "cmds",
+                            "command"
+                        ]
+                    })
                 )
+            ),
+            Argument(
+                "random number",
+                int
             )
         ]
     )

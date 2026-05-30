@@ -16,7 +16,7 @@ async def handle_message(context: Context):
         if cmd:
             await cmd
     except ParseError as e:
-        await context.reply(f"Error parsing command: {e.message}.\nUse `fish!help` to see command shape.")
+        await context.reply(f"Error parsing command: {e.message}.\nUse `{Config.instance.prefixes[0]}help` to see command shape.")
 
 
 def setup(server: Server):

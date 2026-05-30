@@ -49,6 +49,8 @@ class ParsingArgument:
 
 
 class Strategy(ABC):
+    accept_end_of_stream = False
+
     @abstractmethod
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any: pass
 

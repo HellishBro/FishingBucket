@@ -51,8 +51,13 @@ async def parse_command_arguments(clean_string: str, arguments: list[Argument], 
     stream = CharacterStream(clean_string)
     results = []
     for idx, arg in enumerate(arguments):
+        strat = strategize(arg.strategy)
+
+        if not strat.accept_end_of_stream and stream.end:
+            raise ParseError(f"unexpected end of arguments while trying to parse argument #{idx + 1} `{arg.name}`")
+
         try:
-            results.append(await strategize(arg.strategy).parse(stream, ParsingArgument(arg, idx, len(arguments) - idx - 1), context))
+            results.append(await strat.parse(stream, ParsingArgument(arg, idx, len(arguments) - idx - 1), context))
         except ParseError as e:
             raise ParseError(f"error parsing argument #{idx + 1} `{arg.name}`: {e.message}")
         stream.expect_argument_end()
