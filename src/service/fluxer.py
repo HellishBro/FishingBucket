@@ -257,6 +257,15 @@ class Message(c.Message):
             **kwargs
         )
 
+    async def remove_reaction(self, emoji: str | int, user: int | None | type(...) = ...):
+        if user == ...:
+            await self.raw.clear_reaction(emoji)
+        else:
+            await self.raw.remove_reaction(emoji, user or "@me")
+
+    async def add_reaction(self, emoji: str | int):
+        await self.raw.add_reaction(emoji)
+
 
 class Webhook(c.Webhook):
     raw: fluxer.Webhook
@@ -413,6 +422,9 @@ class ReactionActionEvent(c.ReactionActionEvent):
 
     async def context(self) -> Context:
         return Message(await self.bot.fetch_message(str(self.raw.channel_id), str(self.raw.message_id)), self.bot).context
+
+    async def user(self) -> User:
+        return User(await self.bot.fetch_user(str(self.raw.user_id)), self.bot)
 
     @property
     def emoji(self) -> str | int:

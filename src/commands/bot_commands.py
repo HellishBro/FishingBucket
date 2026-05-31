@@ -1,6 +1,5 @@
-from datetime import datetime
-
-from .generic import hook_command, get_commands
+from .generic import hook_command, get_commands, get_command_groups, strategize
+from .utils import paged
 from ..backend.config import Config
 from ..backend.data_reader import DataReader
 from ..backend.template_utils import Template
@@ -48,12 +47,25 @@ def setup():
     @hook_command("help")
     async def _(context: Context, topic: str | None):
         if topic is None:
-            await context.reply("", [Embed(
-                "Help",
+            pages = [
                 Template.from_string(DataReader.instance["help.md"]).compute({
                     "config": Config.instance
                 }, "")
-            )])
+            ]
+            for group_id, group in get_command_groups().items():
+                page = f"**{group.brief}** (`{group.canonical_name}`): {group.description}\n"
+                for cmd_id in group.commands:
+                    cmd = get_commands()[cmd_id]
+                    page += f"\n- `{Config.instance.prefixes[0]}{cmd.get_usage(strategize)}` - {cmd.brief}"
+                pages.append(page)
+
+            await paged(
+                context,
+                "Help",
+                pages,
+                0
+            )
+            return
 
         commands = get_commands()
         if topic in commands:

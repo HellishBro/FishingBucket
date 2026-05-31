@@ -233,6 +233,12 @@ class Message(ABC):
     @abstractmethod
     async def edit(self, content: str, embeds: list[Embed] = None, **kwargs): pass
 
+    @abstractmethod
+    async def remove_reaction(self, emoji: str | int, user: int | None | type(...) = ...): pass
+
+    @abstractmethod
+    async def add_reaction(self, emoji: str | int): pass
+
 
 class Webhook(ABC):
     def __init__(self, raw, bot):
@@ -285,6 +291,9 @@ class ReactionActionEvent(ABC):
 
     @abstractmethod
     async def context(self) -> Context: pass
+
+    @abstractmethod
+    async def user(self) -> User: pass
 
     @property
     @abstractmethod

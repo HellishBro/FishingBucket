@@ -66,7 +66,7 @@ class Interactions:
                     await interaction.callback(*args)
                     if interaction.pop_after_use:
                         del interactions
-                        if not self.react_interactions[context.id, context.platform]:
+                        if (context.id, context.platform) in self.react_interactions and not self.react_interactions[context.id, context.platform]:
                             self.react_interactions.pop((context.id, context.platform))
                     ret = True
         return ret

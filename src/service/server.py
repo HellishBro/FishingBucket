@@ -37,15 +37,20 @@ class Fluxer(Server[fluxer.Bot]):
     platform = Platform.Fluxer
     bot: fluxer.Bot
 
+    def __init__(self):
+        self.events: list[Coro] = []
+
     async def start(self):
         self.bot = fluxer.Bot(intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
+        for event in self.events:
+            self.bot.event(event)
         await self.bot.start(Config.instance.token)
 
     async def close(self):
         await self.bot.close()
 
     def event(self, function: Coro):
-        self.bot.event(function)
+        self.events.append(function)
 
     def clear_events(self):
         self.bot._event_handlers.clear()
@@ -58,15 +63,20 @@ class Discord(Server[discord.Bot]):
     platform = Platform.Discord
     bot: discord.Bot
 
+    def __init__(self):
+        self.events: list[Coro] = []
+
     async def start(self):
         self.bot = discord.Bot(intents=discord.Intents.all())
+        for event in self.events:
+            self.bot.event(event)
         await self.bot.start(Config.instance.discord.token)
 
     async def close(self):
         await self.bot.close()
 
     def event(self, function: Coro):
-        self.bot.event(function)
+        self.events.append(function)
 
     def clear_events(self):
         self.bot._event_handlers.clear()
