@@ -4,6 +4,9 @@ from typing import Callable, Coroutine, Any
 import discord
 import fluxer
 
+from .common import Bot as BotT
+from .discord import Bot as DiscordBot
+from .fluxer import Bot as FluxerBot
 from .enums import Platform
 from ..backend.config import Config
 
@@ -26,14 +29,16 @@ class Server[Bot = fluxer.Bot | discord.Bot](ABC):
     @abstractmethod
     def clear_events(self): pass
 
+    @abstractmethod
+    def get_bot(self) -> BotT: pass
+
 
 class Fluxer(Server[fluxer.Bot]):
     platform = Platform.Fluxer
-
-    def __init__(self):
-        self.bot = fluxer.Bot(intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
+    bot: fluxer.Bot
 
     async def start(self):
+        self.bot = fluxer.Bot(intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
         await self.bot.start(Config.instance.token)
 
     async def close(self):
@@ -45,14 +50,16 @@ class Fluxer(Server[fluxer.Bot]):
     def clear_events(self):
         self.bot._event_handlers.clear()
 
+    def get_bot(self) -> FluxerBot:
+        return FluxerBot(self.bot, self.bot)
+
 
 class Discord(Server[discord.Bot]):
     platform = Platform.Discord
-
-    def __init__(self):
-        self.bot = discord.Bot(intents=discord.Intents.all())
+    bot: discord.Bot
 
     async def start(self):
+        self.bot = discord.Bot(intents=discord.Intents.all())
         await self.bot.start(Config.instance.discord.token)
 
     async def close(self):
@@ -63,6 +70,9 @@ class Discord(Server[discord.Bot]):
 
     def clear_events(self):
         self.bot._event_handlers.clear()
+
+    def get_bot(self) -> DiscordBot:
+        return DiscordBot(self.bot, self.bot)
 
 
 ALL_SERVERS = [Fluxer, Discord]
