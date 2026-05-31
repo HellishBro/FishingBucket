@@ -283,6 +283,10 @@ class Bot(ABC):
     @abstractmethod
     def user(self) -> User: pass
 
+    @property
+    @abstractmethod
+    def guilds(self) -> list[Guild]: pass
+
 
 class ReactionActionEvent(ABC):
     def __init__(self, raw, bot):

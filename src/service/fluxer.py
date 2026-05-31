@@ -415,6 +415,10 @@ class Bot(c.Bot):
     def user(self) -> User:
         return User(self.raw.user, self.bot)
 
+    @property
+    def guilds(self) -> list[Guild]:
+        return [Guild(guild, self.bot) for guild in self.raw.guilds]
+
 
 class ReactionActionEvent(c.ReactionActionEvent):
     raw: fluxer.models.RawReactionActionEvent

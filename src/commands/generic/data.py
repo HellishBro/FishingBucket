@@ -97,7 +97,7 @@ class Command:
         for argument in self.arguments:
             parts.append(argument.get_example())
 
-        return " ".join(parts).replace("  ", " ")
+        return " ".join(parts).replace("  ", " ").strip()
 
 
     def get_usage(self, strategize: Callable[[Strategible], Strategy]) -> str:
@@ -109,7 +109,7 @@ class Command:
             part = f"{strat.bracket_start}{argument.name}: {placeholder}{strat.bracket_end}"
             parts.append(part)
 
-        return " ".join(parts)
+        return " ".join(parts).strip()
 
 
 

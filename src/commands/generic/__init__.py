@@ -10,6 +10,11 @@ type CommandCallable[Ctx] = Callable[[Ctx, ...], Coroutine[Any, Any, Any]]
 command_registry: dict[str, Command] = {}
 command_hooks: dict[tuple[str, Platform], CommandCallable[Context]] = {}
 command_groups: dict[str, CommandGroup] = {}
+session_command_usages: int = 0
+
+
+def get_session_command_usages() -> int:
+    return session_command_usages
 
 
 def make_command(
@@ -90,11 +95,13 @@ async def parse_command_arguments(clean_string: str, arguments: list[Argument], 
 
 
 async def get_command_awaitable(context: Context, prefixes: list[str]) -> Coroutine[Any, Any, Any] | None:
+    global session_command_usages
     for prefix in prefixes:
         if context.content.startswith(prefix):
             sans_prefix = context.content[len(prefix):].strip()
             for name, command in command_registry.items():
                 if any(sans_prefix.lower().startswith((matched_name := n).lower()) for n in sorted([command.canonical_name] + command.aliases, key=len, reverse=True)):
                     arguments = await parse_command_arguments(sans_prefix[len(matched_name):].strip(), command.arguments, context)
+                    session_command_usages += 1
                     return command_hooks[name, context.platform](context, *arguments)
     return None
