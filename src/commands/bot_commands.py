@@ -4,29 +4,21 @@ from .generic import hook_command, get_commands
 from ..backend.config import Config
 from ..backend.data_reader import DataReader
 from ..backend.template_utils import Template
-from ..service import Platform, FluxerContext, DiscordContext, IntersectionContext
+from ..service import Platform, Context, Embed
 
 
 def setup():
-    @hook_command("ping", Platform.Fluxer)
-    async def _(context: FluxerContext):
-        stime = datetime.fromisoformat(context.message.timestamp)
+    @hook_command("ping")
+    async def _(context: Context):
+        stime = context.message.timestamp
         m = await context.reply(f"Pong! Latency is calculating! :ping_pong:")
-        etime = datetime.fromisoformat(m.timestamp)
+        etime = m.message.timestamp
         diff = etime - stime
-        await m.edit(f"Pong! Latency is {int(diff.microseconds / 1000)} ms! :ping_pong:")
-
-    @hook_command("ping", Platform.Discord)
-    async def _(context: DiscordContext):
-        stime = context.message.created_at
-        m = await context.reply(f"Pong! Latency is calculating! :ping_pong:")
-        etime = m.created_at
-        diff = etime - stime
-        await m.edit(content=f"Pong! Latency is {int(diff.microseconds / 1000)} ms! :ping_pong:")
+        await m.message.edit(f"Pong! Latency is {int(diff.microseconds / 1000)} ms! :ping_pong:")
 
 
     @hook_command("invite")
-    async def _(context: IntersectionContext):
+    async def _(context: Context):
         def get_invites(plat: Platform) -> tuple[str, str]:
             return (
                 Config.instance.bot_invite if plat == Platform.Fluxer else Config.instance.discord.bot_invite,
@@ -46,7 +38,7 @@ def setup():
             description += "\n".join(parts)
 
         await context.reply("", embeds=[
-            context.Embed(
+            Embed(
                 "Invite Me!",
                 description
             )
@@ -54,9 +46,9 @@ def setup():
 
 
     @hook_command("help")
-    async def _(context: IntersectionContext, topic: str | None):
+    async def _(context: Context, topic: str | None):
         if topic is None:
-            await context.reply("", [context.Embed(
+            await context.reply("", [Embed(
                 "Help",
                 Template.from_string(DataReader.instance["help.md"]).compute({
                     "config": Config.instance

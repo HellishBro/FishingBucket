@@ -1,9 +1,9 @@
 import discord
 import fluxer
 
-from ..service.enums import Platform
-from ..service.context import FluxerContext, DiscordContext, Context
-from ..service.server import Server, Fluxer, Discord
+from ..service import Context, Platform, Server, FluxerServer, DiscordServer, FluxerContext, DiscordContext
+from ..service.fluxer import Message as FluxerMessage
+from ..service.discord import Message as DiscordMessage
 from ..backend.config import Config
 from ..commands.generic import get_command_awaitable, ParseError
 
@@ -31,15 +31,15 @@ def setup(server: Server):
         setup_discord(server)
 
 
-def setup_fluxer(server: Fluxer):
+def setup_fluxer(server: FluxerServer):
     @server.event
     async def on_message(message: fluxer.Message):
-        context = FluxerContext(Platform.Fluxer, server.bot, message)
+        context = FluxerContext(FluxerMessage(message, server.bot), server.bot)
         await handle_message(context)
 
 
-def setup_discord(server: Discord):
+def setup_discord(server: DiscordServer):
     @server.event
     async def on_message(message: discord.Message):
-        context = DiscordContext(Platform.Discord, server.bot, message)
+        context = DiscordContext(DiscordMessage(message, server.bot), server.bot)
         await handle_message(context)

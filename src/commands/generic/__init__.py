@@ -91,8 +91,8 @@ async def parse_command_arguments(clean_string: str, arguments: list[Argument], 
 
 async def get_command_awaitable(context: Context, prefixes: list[str]) -> Coroutine[Any, Any, Any] | None:
     for prefix in prefixes:
-        if context.message_content.startswith(prefix):
-            sans_prefix = context.message_content[len(prefix):].strip()
+        if context.content.startswith(prefix):
+            sans_prefix = context.content[len(prefix):].strip()
             for name, command in command_registry.items():
                 if any(sans_prefix.lower().startswith((matched_name := n).lower()) for n in sorted([command.canonical_name] + command.aliases, key=len, reverse=True)):
                     arguments = await parse_command_arguments(sans_prefix[len(matched_name):].strip(), command.arguments, context)
