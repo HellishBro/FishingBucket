@@ -24,29 +24,29 @@ def get_smart_pages[T](everything: list[T], function: Callable[[list[T]], tuple[
     return pages
 
 
-def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detailed = False, length_limit = 4096) -> tuple[str, int]:
-    def list_fields(proxy: Proxy) -> str:
-        lines = []
-        if (not user_preference.private_group or detailed) and len(bunch) == 1:
-            lines.append(f"- Group: {proxy.group.name if proxy.group else '*N/A*'}")
-        if not user_preference.private_trigger or detailed:
-            lines.append(f"- Triggers: {', '.join(f'`{trigger}`' for trigger in proxy.triggers) if proxy.triggers and any(bool(t) for t in proxy.triggers) else '*N/A*'}")
-        lines.append(f"- Avatar: [source]({proxy.avatar_url})")
-        if not user_preference.private_forms or detailed:
-            if proxy.forms:
-                lines.append(f"- Forms:")
-                for fname, furl in proxy.forms.items():
-                    lines.append(f"    - {fname}: [avatar]({furl}){' (current)' if proxy.current_form == fname else ''}")
+def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detailed = False, length_limit = 4096, display_group: bool = True) -> tuple[str, int]:
+    def list_fields(prox: Proxy) -> str:
+        lns = []
+        if user_preference.public_group or detailed and display_group:
+            lns.append(f"- Group: {prox.group.name if prox.group else '*N/A*'}")
+        if user_preference.public_trigger or detailed:
+            lns.append(f"- Triggers: {', '.join(f'`{trigger}`' for trigger in prox.triggers) if prox.triggers and any(bool(t) for t in prox.triggers) else '*N/A*'}")
+        lns.append(f"- Avatar: [source]({prox.avatar_url})")
+        if user_preference.public_forms or detailed:
+            if prox.forms:
+                lns.append(f"- Forms:")
+                for fname, furl in prox.forms.items():
+                    lns.append(f"    - {fname}: [avatar]({furl}){' (current)' if prox.current_form == fname else ''}")
 
-        if not user_preference.private_metadata or detailed:
-            lines.append(f"- Messages Send: {proxy.times_used}")
-            lines.append(f"- Creation Date: {format_date(datetime.fromtimestamp(proxy.creation_date))}")
-        if not user_preference.private_description or detailed:
-            if proxy.description:
-                lines.append("- Description:")
-                for line in proxy.description.split("\n"):
-                    lines.append(f"> {line}")
-        return "\n".join(lines)
+        if user_preference.public_metadata or detailed:
+            lns.append(f"- Messages Send: {prox.times_used}")
+            lns.append(f"- Creation Date: {format_date(datetime.fromtimestamp(prox.creation_date))}")
+        if user_preference.public_description or detailed:
+            if prox.description:
+                lns.append("- Description:")
+                for ln in prox.description.split("\n"):
+                    lns.append(f"> {ln}")
+        return "\n".join(lns)
 
     lines = []
     chars = 0
@@ -97,13 +97,13 @@ async def paged_proxy_list(context: Context, proxies: list[Proxy], title: str, p
                     page_fore += "\n> " + line
 
             length_limit = 4096 - len(page_fore)
-            pages.extend(get_smart_pages(group_proxies, lambda section: get_proxies_text(section, preferences, detailed, length_limit), page_fore + "\n\n"))
+            pages.extend(get_smart_pages(group_proxies, lambda section: get_proxies_text(section, preferences, detailed, length_limit, False), page_fore + "\n\n"))
 
         group_proxies = [proxy for proxy in proxies if proxy.group is None]
     else:
         group_proxies = proxies
 
-    pages.extend(get_smart_pages(group_proxies, lambda section: get_proxies_text(section, preferences, detailed, 4096)))
+    pages.extend(get_smart_pages(group_proxies, lambda section: get_proxies_text(section, preferences, detailed, 4096, False)))
 
     await paged(
         context,
