@@ -1,3 +1,5 @@
+import random
+
 from ..generic import make_command_group, make_command, Argument
 from ..generic.strategies import Optional
 from ..specific import TemplateStrategy, UnknownPageNumber
@@ -67,6 +69,33 @@ def setup():
                         bool,
                         False
                     )
+                )
+            ]
+        )
+    )
+
+    proxy_commands.append(
+        make_command(
+            {
+                "find": [
+                    "f"
+                ]
+            },
+            "Finds all of your proxies that matches a certain name.",
+            """
+            Finds all of your proxies that matches a certain name.
+            The first result will be chosen if you use the name as an argument to `proxy` type parameters.
+            This will also list some issues that might give you an error if the name is used.
+            """,
+            [
+                Argument(
+                    "name",
+                    str,
+                    lambda: random.choice([
+                        "\"My Proxy's Name\"",
+                        "\"My Proyx's Naem\"",
+                        "\"my poxy'sn ame\""
+                    ])
                 )
             ]
         )

@@ -52,7 +52,7 @@ def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detail
     chars = 0
     i = 0
     for i, proxy in enumerate(bunch):
-        line = f"**{proxy.name}**{(' (aka **' + proxy.nickname + '**)') if proxy.nickname else ''} (`{str(hex(proxy.id))[2:]}`)\n{list_fields(proxy)}"
+        line = f"**{proxy.name}**{(' (aka **' + proxy.nickname + '**)') if proxy.nickname else ''} (`{proxy.id}`)\n{list_fields(proxy)}"
         if chars + len(line) > length_limit:
             if chars == 0:
                 return line[:length_limit - 3] + "...", 1
@@ -64,12 +64,12 @@ def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detail
     return "\n\n".join(lines), i + 1
 
 
-async def paged_proxy_list(context: Context, proxies: list[Proxy], title: str, page: int, detailed: bool):
+async def paged_proxy_list(context: Context, proxies: list[Proxy], title: str, page: int, detailed: bool, additional_embeds: list[Embed] = None):
     if not proxies:
         await context.reply("", [Embed(
             f"{title} (0 total)",
             f"It's as empty as a desert out here...\n\nTry running `{get_command_invocation('register')}` to get started!"
-        )])
+        )] + (additional_embeds or []))
         return
 
     preferences = await Database.instance.get_user_preferences(await get_uid(context))
@@ -78,7 +78,7 @@ async def paged_proxy_list(context: Context, proxies: list[Proxy], title: str, p
         await context.reply("", [Embed(
             f"{title} (? total)",
             f"This proxy list cannot be viewed."
-        )])
+        )] + (additional_embeds or []))
         return
 
     pages = []
@@ -109,11 +109,12 @@ async def paged_proxy_list(context: Context, proxies: list[Proxy], title: str, p
         context,
         f"{title} ({len(proxies)} total)",
         pages,
-        page
+        page,
+        additional_embeds
     )
 
 
-async def paged(context: Context, title: str, pages: list[str], start_page: int):
+async def paged(context: Context, title: str, pages: list[str], start_page: int, additional_embeds: list[Embed] = None):
     LEFT, RIGHT = "⬅️", "➡️"
 
     author = context.author.id
@@ -132,7 +133,7 @@ async def paged(context: Context, title: str, pages: list[str], start_page: int)
     if embed := await get_page(start_page):
         page = start_page
 
-        reply_ctx = await context.reply("", [embed])
+        reply_ctx = await context.reply("", [embed] + (additional_embeds or []))
         message = reply_ctx.message
 
         async def callback(event: ReactionActionEvent):
@@ -153,7 +154,7 @@ async def paged(context: Context, title: str, pages: list[str], start_page: int)
                         await message.remove_reaction(RIGHT, author)
                     page += 1
                 page = max(min(page, len(pages) - 1), 0)
-                await message.edit("", embeds=[await get_page(page)])
+                await message.edit("", embeds=[await get_page(page)] + (additional_embeds or []))
 
             if len(pages) != 1:
                 if page == len(pages) - 1:
