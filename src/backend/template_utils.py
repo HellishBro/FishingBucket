@@ -33,6 +33,7 @@ functions.extend([len, repr, str])
 class Template:
     def __init__(self, parts: list[TemplatePart], errors: list[str] = None):
         self.parts = parts
+        self.string: str | None = None
         self.errors: list[str] = errors or []
 
     @classmethod
@@ -99,6 +100,7 @@ class Template:
                 simplified.append(part)
 
         obj = cls(simplified, errors)
+        obj.string = string
         Cache.ParseCache.set(string, obj)
         return obj
 

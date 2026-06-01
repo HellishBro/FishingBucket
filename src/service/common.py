@@ -30,6 +30,10 @@ class Attachment(ABC):
     @abstractmethod
     def filename(self) -> str: pass
 
+    @property
+    @abstractmethod
+    def url(self) -> str: pass
+
     @abstractmethod
     async def read(self) -> bytes: pass
 

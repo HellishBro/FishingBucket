@@ -8,7 +8,7 @@ from .backend.data_reader import DataReader
 from .backend.database import Database
 from .interaction import Interactions
 from .backend.cache import CacheStatus
-from . import commands#, interactions_impl
+from . import commands
 from .api_server import app as api_app, ApplicationContext
 from .startup import setup_events, setup_commands
 from .service.server import setup_instances
@@ -21,7 +21,7 @@ def run(config_file: str):
     CacheStatus()
 
     setup_commands.setup()
-    commands.setup()
+    commands.setup_commands()
 
     servers = setup_instances()
     Interactions()

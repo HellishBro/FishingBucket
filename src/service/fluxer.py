@@ -29,6 +29,10 @@ class Attachment(c.Attachment):
     def filename(self) -> str:
         return self.raw.filename
 
+    @property
+    def url(self) -> str:
+        return self.raw.url
+
     async def read(self) -> bytes:
         async with ClientSession() as session:
             async with session.get(self.raw.proxy_url) as res:

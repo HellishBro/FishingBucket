@@ -29,6 +29,10 @@ class Attachment(c.Attachment):
     def filename(self) -> str:
         return self.raw.filename
 
+    @property
+    def url(self) -> str:
+        return self.raw.url
+
     async def read(self) -> bytes:
         return await self.raw.read()
 

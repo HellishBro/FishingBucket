@@ -669,8 +669,10 @@ class Database:
 
         await self.set_global_data("version", str(version), version)
 
-    @Cache.user_id.cache_async()
     async def get_user_id(self, sso: int, platform: Platform = Platform.Fluxer, create: bool = True) -> int:
+        if dat := Cache.user_id.get((sso, platform)):
+            return dat
+
         async with self.connection.execute(
                 "SELECT owner FROM accounts WHERE user_id = ? AND account_type = ?",
                 (sso, platform.get())
@@ -685,9 +687,11 @@ class Database:
                         "INSERT INTO accounts (user_id, account_type, owner) VALUES (?, ?, ?)",
                         (sso, platform.get(), new_user_id)
                 ):
+                    Cache.user_id.set((sso, platform), new_user_id)
                     return new_user_id
             return -1
 
+        Cache.user_id.set((sso, platform), curs[0])
         return curs[0]
 
     async def link_accounts(self, user_id: int, sso_id: int, platform: Platform):

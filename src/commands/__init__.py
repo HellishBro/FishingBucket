@@ -1,4 +1,8 @@
-from . import bot_commands
+from . import bot_commands, proxy_commands
 
-def setup():
-    bot_commands.setup()
+modules = [bot_commands, proxy_commands]
+
+def setup_commands():
+    for module in modules:
+        module.setup()
+

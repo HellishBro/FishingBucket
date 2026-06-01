@@ -2,7 +2,7 @@ import random
 from typing import Any
 
 from .data import Strategy, CharacterStream, ParseError, SyntaxParseError, ParsingArgument, Strategible
-from .misc import lorem_ipsum
+from .misc import lorem_ipsum, escape_string
 from ...service import Context, Role, Channel, User
 
 
@@ -133,7 +133,7 @@ class StringStrategy(Strategy):
                 s += stream.consume()
 
     def example(self) -> str:
-        return repr(lorem_ipsum("SHORT")())
+        return escape_string(lorem_ipsum("SHORT")())
 
     def get_placeholder_text(self) -> str:
         return "string"

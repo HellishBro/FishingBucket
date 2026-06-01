@@ -1,3 +1,4 @@
+from ..backend.template_utils import Template, TextPart
 from ..interaction import Interactions, Interaction
 from ..service import Context, Embed, ReactionActionEvent
 
@@ -34,9 +35,12 @@ async def paged(context: Context, title: str, pages: list[str], start_page: int)
                         await message.add_reaction(RIGHT)
                     page -= 1
                 else:
-                    await message.remove_reaction(RIGHT, author)
                     if page == 0:
+                        await message.remove_reaction(RIGHT)
                         await message.add_reaction(LEFT)
+                        await message.add_reaction(RIGHT)
+                    else:
+                        await message.remove_reaction(RIGHT, author)
                     page += 1
                 page = max(min(page, len(pages) - 1), 0)
                 await message.edit("", embeds=[await get_page(page)])
@@ -57,3 +61,13 @@ async def paged(context: Context, title: str, pages: list[str], start_page: int)
                 await message.add_reaction(LEFT)
             if page != len(pages) - 1:
                 await message.add_reaction(RIGHT)
+
+
+def example_trigger_text(trigger: Template) -> str:
+    res = ""
+    for part in trigger.parts:
+        if isinstance(part, TextPart):
+            res += part.content
+        else:
+            res += "hello"
+    return res
