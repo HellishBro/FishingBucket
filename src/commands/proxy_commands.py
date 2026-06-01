@@ -37,11 +37,9 @@ def setup():
             )
         )
 
-        hex_id = hex(new_proxy.id)
-
         embed = Embed(
-            f"{name} (`{hex_id}`)",
-            f"Proxy **{name}** is registered with an ID of `{hex_id}`!\nSay hello with it by typing `{example_trigger_text(trigger)}`",
+            f"{name} (`{new_proxy.id}`)",
+            f"Proxy **{name}** is registered with an ID of `{new_proxy.id}`!\nSay hello with it by typing `{example_trigger_text(trigger)}`",
             thumbnail_url=avatar_url
         )
         await context.reply("", [embed])

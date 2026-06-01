@@ -8,9 +8,14 @@ import json
 from .template_utils import Template
 
 
+class ID(int):
+    def __str__(self):
+        return hex(self)
+
+
 @dataclass
 class ProxyGroup:
-    id: int | None
+    id: ID | None
     name: str
     description: str
     owner: int
@@ -29,7 +34,7 @@ class ProxyGroup:
 
     @classmethod
     def from_database(cls, data: tuple[int, str, str, int, float, str, int], parent: ProxyGroup | None) -> ProxyGroup:
-        return cls(data[0], data[1], data[2], data[3], data[4], data[5], parent)
+        return cls(ID(data[0]), data[1], data[2], data[3], data[4], data[5], parent)
 
     @classmethod
     def from_tupper(cls, group: dict, owner: int) -> dict[int, ProxyGroup]:
@@ -66,7 +71,7 @@ def sanitize(potential_template: str) -> str:
 
 @dataclass
 class Proxy:
-    id: int | None
+    id: ID | None
     name: str
     description: str
     avatar_url: str
@@ -89,7 +94,7 @@ class Proxy:
         if data[8] and groups:
             group = [g for g in groups if g.id == data[8]][0]
 
-        return cls(data[0], data[1], data[2], data[3], data[4].split("\n"), data[5], data[6], data[7], group, data[9], json.loads(data[10] or "{}"), data[11])
+        return cls(ID(data[0]), data[1], data[2], data[3], data[4].split("\n"), data[5], data[6], data[7], group, data[9], json.loads(data[10] or "{}"), data[11])
 
     @classmethod
     def from_tupper(cls, tupper: dict, owner: int, groups: dict[int, ProxyGroup]) -> Proxy:

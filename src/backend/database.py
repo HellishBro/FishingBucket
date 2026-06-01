@@ -6,7 +6,7 @@ from collections import namedtuple
 from dataclasses import dataclass
 
 from .cache import TTLCache
-from .models import Proxy, ProxyGroup
+from .models import Proxy, ProxyGroup, ID
 from ..service import Platform
 
 lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner", "times_used", "creation_date", "proxy_group", "nickname", "proxy_forms", "current_form"]
@@ -998,7 +998,7 @@ class Database:
             (proxy.name, proxy.description, proxy.avatar_url, "\n".join(proxy.triggers), proxy.owner, proxy.times_used, time.time(), proxy.group.id if proxy.group else None, proxy.nickname, json.dumps(proxy.forms), proxy.current_form)
         )
         await self.connection.commit()
-        proxy.id = cursor.lastrowid
+        proxy.id = ID(cursor.lastrowid)
         Cache.proxies_from_user.invalidate(proxy.owner)
         await cursor.close()
 
@@ -1013,7 +1013,7 @@ class Database:
         )
         await self.connection.commit()
 
-        group.id = cursor.lastrowid
+        group.id = ID(cursor.lastrowid)
         Cache.groups_from_user.invalidate(group.owner)
         await cursor.close()
 
