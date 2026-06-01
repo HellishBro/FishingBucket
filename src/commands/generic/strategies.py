@@ -227,6 +227,7 @@ class Optional(Strategy):
     accept_end_of_stream = True
     bracket_start = "["
     bracket_end = "]"
+    expect_start_another = True
 
     def __init__(self, strat: Strategible, default: Any):
         self.strat = strategize(strat)

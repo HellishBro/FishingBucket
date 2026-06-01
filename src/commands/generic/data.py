@@ -27,7 +27,7 @@ class CharacterStream:
 
     def expect_argument_end(self):
         if self.peek() not in ("\0", " "):
-            raise SyntaxParseError(f"unexpected another argument; found fragments of the previous argument")
+            raise SyntaxParseError(f"unexpectedly found another argument; found fragments of the previous argument")
 
         while self.peek() == " ":
             self.consume()
@@ -52,6 +52,7 @@ class Strategy(ABC):
     accept_end_of_stream = False
     bracket_start = "<"
     bracket_end = ">"
+    expect_start_another = False
 
     @abstractmethod
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any: pass

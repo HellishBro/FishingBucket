@@ -6,7 +6,7 @@ from ..service import Context, Platform, Server, FluxerServer, DiscordServer, Fl
 from ..service.fluxer import Message as FluxerMessage, ReactionActionEvent as FluxerReactionActionEvent
 from ..service.discord import Message as DiscordMessage, ReactionActionEvent as DiscordReactionActionEvent
 from ..backend.config import Config
-from ..commands.generic import get_command_awaitable, ParseError
+from ..commands.generic import get_command_awaitable, ParseError, EarlyExitException
 
 
 async def handle_message(context: Context):
@@ -18,6 +18,8 @@ async def handle_message(context: Context):
             await cmd
     except ParseError as e:
         await context.reply(f"Error parsing command: {e.message}.\nUse `{Config.instance.prefixes[0]}help` to see command shape.")
+    except EarlyExitException:
+        pass
 
 
 async def handle_reaction(context: ReactionActionEvent, server: Server):

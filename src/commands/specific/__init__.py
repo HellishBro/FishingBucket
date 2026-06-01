@@ -1,11 +1,12 @@
 import random
+from typing import Awaitable, Any
 
 from textdistance import damerau_levenshtein as edit_distance
 
-from ..generic import CharacterStream, ParsingArgument
+from ..generic import CharacterStream, ParsingArgument, EarlyExitException
 from ..generic.data import Strategy, SyntaxParseError, ParseError
 from ..generic.misc import escape_string
-from ..generic.strategies import OneOf, HexadecimalStrategy, StringStrategy
+from ..generic.strategies import OneOf, HexadecimalStrategy, StringStrategy, IntegerStrategy
 from ...backend.config import Config
 from ...backend.database import Database
 from ...backend.models import Proxy, ProxyGroup
@@ -14,8 +15,12 @@ from ...backend.utils import normalize_emojis
 from ...service import Context
 
 
-async def get_uid(context: Context, create: bool = False) -> int:
-    return await Database.instance.get_user_id(context.author.id, context.platform, create)
+async def get_uid(context: Context, create: bool = False, on_unregistered: Awaitable[Any] = None) -> int:
+    uid = await Database.instance.get_user_id(context.author.id, context.platform, create)
+    if uid == -1 and on_unregistered:
+        await on_unregistered
+        raise EarlyExitException()
+    return uid
 
 
 class ProxyStrategy(Strategy):
@@ -157,3 +162,18 @@ class TemplateStrategy(Strategy):
 
     def get_placeholder_text(self) -> str:
         return "template"
+
+
+class UnknownPageNumber(IntegerStrategy):
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> int:
+        num = await super().parse(stream, argument, context)
+        if num < 1:
+            raise ParseError(f"{num} is out of range 1~..")
+
+        return num - 1
+
+    def example(self) -> str:
+        return str(random.randint(0, 10))
+
+    def get_placeholder_text(self) -> str:
+        return "page"

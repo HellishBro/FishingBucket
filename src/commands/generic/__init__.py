@@ -3,7 +3,12 @@ from typing import Callable, Coroutine, Any
 
 from .data import Command, Argument, CharacterStream, ParsingArgument, ParseError, CommandGroup
 from .strategies import strategize
+from ...backend.config import Config
 from ...service import Context, Platform
+
+
+class EarlyExitException(Exception): pass
+
 
 type CommandCallable[Ctx] = Callable[[Ctx, ...], Coroutine[Any, Any, Any]]
 
@@ -50,6 +55,10 @@ def make_command_group(
     return group
 
 
+def get_command_invocation(command: str) -> str:
+    return f"{Config.instance.prefixes[0]}{command_registry[command].get_usage(strategize)}"
+
+
 def get_commands() -> dict[str, Command]:
     return command_registry
 
@@ -90,7 +99,13 @@ async def parse_command_arguments(clean_string: str, arguments: list[Argument], 
             results.append(await strat.parse(stream, ParsingArgument(arg, idx, len(arguments) - idx - 1), context))
         except ParseError as e:
             raise ParseError(f"error parsing argument #{idx + 1} `{arg.name}`: {e.message}")
-        stream.expect_argument_end()
+
+        if not strat.expect_start_another:
+            try:
+                stream.expect_argument_end()
+            except ParseError as e:
+                raise ParseError(f"error transitioning to argument #{idx + 1}: {e.message}")
+
     return results
 
 

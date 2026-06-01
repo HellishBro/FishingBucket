@@ -42,6 +42,25 @@ class UserPreference(namedtuple("UserPreference", "private_description private_t
     private_forms: bool
     dice_functions: bytes
 
+    @property
+    def public_description(self) -> bool: return not self.private_description
+
+    @property
+    def public_trigger(self) -> bool: return not self.private_trigger
+
+    @property
+    def public_metadata(self) -> bool: return not self.private_metadata
+
+    @property
+    def public_group(self) -> bool: return not self.private_group
+
+    @property
+    def public_list(self) -> bool: return not self.private_list
+
+    @property
+    def public_forms(self) -> bool: return not self.private_forms
+
+
 class GuildPreference(namedtuple("GuildPreference", "disallow_by_default logging_channel dice_functions guild_type")):
     disallow_by_default: bool
     logging_channel: int

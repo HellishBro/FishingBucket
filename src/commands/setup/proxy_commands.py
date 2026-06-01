@@ -1,5 +1,6 @@
 from ..generic import make_command_group, make_command, Argument
-from ..specific import TemplateStrategy
+from ..generic.strategies import Optional
+from ..specific import TemplateStrategy, UnknownPageNumber
 
 
 def setup():
@@ -33,6 +34,39 @@ def setup():
                     TemplateStrategy([
                         "text"
                     ])
+                )
+            ]
+        )
+    )
+
+    proxy_commands.append(
+        make_command(
+            {
+                "list": [
+                    "l"
+                ]
+            },
+            "Lists your registered proxies.",
+            """
+            Lists your registered proxies.
+            If `page` is provided, it will display the proxies on that page number.
+            If `detailed` is provided, it will ignore your privacy preferences and display everything. This is automatically true in DMs.
+            As of now, this command will not be able to inspect another user's proxies.
+            """,
+            [
+                Argument(
+                    "page",
+                    Optional(
+                        UnknownPageNumber(),
+                        0
+                    )
+                ),
+                Argument(
+                    "detailed",
+                    Optional(
+                        bool,
+                        False
+                    )
                 )
             ]
         )

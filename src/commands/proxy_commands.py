@@ -2,7 +2,7 @@ from datetime import datetime
 
 from .generic import hook_command
 from .specific import get_uid
-from .utils import example_trigger_text
+from .utils import example_trigger_text, paged_proxy_list
 from ..backend.database import Database
 from ..backend.models import Proxy
 from ..backend.template_utils import Template
@@ -43,3 +43,16 @@ def setup():
             thumbnail_url=avatar_url
         )
         await context.reply("", [embed])
+
+
+    @hook_command("list")
+    async def _(context: Context, page: int, detailed: bool):
+        uid = await get_uid(context)
+
+        await paged_proxy_list(
+            context,
+            await Database.instance.get_user_proxies(uid),
+            f"Registered Proxies of {context.author.display_name}",
+            page,
+            context.channel.dm or detailed
+        )

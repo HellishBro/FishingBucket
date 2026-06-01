@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from .generic import hook_command, get_commands, get_command_groups, strategize, Command, CommandGroup, \
-    get_session_command_usages
+    get_session_command_usages, get_command_invocation
 from .utils import paged
 from ..backend.cache import CacheStatus
 from ..backend.config import Config
@@ -71,7 +71,7 @@ def setup():
                 page = f"**{group.brief}** (`{group.canonical_name}`): {group.description}\n"
                 for cmd_id in group.commands:
                     cmd = get_commands()[cmd_id]
-                    page += f"\n- `{Config.instance.prefixes[0]}{cmd.get_usage(strategize)}` - {cmd.brief}"
+                    page += f"\n- `{get_command_invocation(cmd_id)}` - {cmd.brief}"
                 pages.append(page)
 
             await paged(
