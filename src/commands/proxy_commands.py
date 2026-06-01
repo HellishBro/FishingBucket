@@ -5,10 +5,11 @@ from textdistance import damerau_levenshtein as edit_distance
 from .generic import hook_command
 from .specific import get_uid
 from .utils import example_trigger_text, paged_proxy_list
-from ..backend.database import Database
+from ..backend.database import Database, MessageLink
 from ..backend.models import Proxy
 from ..backend.template_utils import Template
 from ..backend.utils import normalize_emojis
+from ..send_proxy import message_matches_trigger, reproxy
 from ..service import Context, Embed
 
 
@@ -103,3 +104,27 @@ def setup():
             context.channel.dm,
             additional_embeds
         )
+
+
+    @hook_command("reproxy")
+    async def _(context: Context, proxy: Proxy):
+        owner = await get_uid(context)
+
+        if context.message.reference:
+            message_id = context.message.reference.id
+        else:
+            message_id = await Database.instance.get_latest_proxy_message_from_user(context.channel.id, owner, context.platform)
+            if not message_id:
+                await context.reply("Error: there are no previous proxied messages from you in this channel!")
+                return
+
+        message_link: MessageLink = await Database.instance.get_message_link(message_id, context.channel.id)
+        proxy_id = message_link.proxy_id
+        old_proxy = await Database.instance.get_proxy(proxy_id)
+
+        if old_proxy.owner != owner:
+            await context.reply("Error: you do not own the original proxy!")
+            return
+
+        await context.message.reference.delete()
+        await reproxy(context, old_proxy, proxy)

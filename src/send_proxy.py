@@ -15,7 +15,7 @@ from .backend.utils import mention_message, convert_attachments, normalize_emoji
     get_guild_id_from_channel, send_webhook
 from src.commands.old.utils import get_uid
 from .response import delete_message
-from .service import Platform
+from .service import Platform, Context
 
 
 def message_matches_trigger(message: str, triggers: list[str]) -> tuple[bool, str]:
@@ -143,11 +143,11 @@ async def modify_message(user: int, guild_preferences: GuildPreference, message:
     return result
 
 
-async def reproxy(old_message: fluxer.Message, bot: fluxer.Bot, old_proxy: Proxy, new_proxy: Proxy, platform_user: int, platform: Platform):
-    contents = old_message.content
-    attachments = old_message.attachments
-    embeds = old_message.embeds
-    parent_message = old_message.referenced_message
+async def reproxy(context: Context, old_proxy: Proxy, new_proxy: Proxy):
+    contents = context.content
+    attachments = context.message.attachments
+    embeds = context.message.embeds
+    parent_message = context.message.reference
     webhook = await get_webhook(old_message.channel_id, bot)
     server_preferences = await Database.instance.get_guild_preferences(Guild((await bot.fetch_channel(str(old_message.channel_id))).guild_id, Platform.Fluxer))
     await old_message.delete()

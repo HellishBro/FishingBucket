@@ -825,10 +825,10 @@ class Database:
             else: return UserPreference(*res[1:])
 
     @Cache.latest_proxy_message_from_user.cache_async()
-    async def get_latest_proxy_message_from_user(self, channel_id: int, owner: int) -> int | None:
+    async def get_latest_proxy_message_from_user(self, channel_id: int, owner: int, platform: Platform) -> int | None:
         async with self.connection.execute(
-            "SELECT ml.message_id FROM message_links ml JOIN proxies p ON ml.proxy_id = p.id WHERE ml.channel_id = ? AND p.owner = ? ORDER BY ml.message_id DESC LIMIT 1",
-            (channel_id, owner)
+            "SELECT ml.message_id FROM message_links ml JOIN proxies p ON ml.proxy_id = p.id WHERE ml.channel_id = ? AND ml.platform_type = ? AND p.owner = ? ORDER BY ml.message_id DESC LIMIT 1",
+            (channel_id, platform.get(), owner)
         ) as cursor:
             res = await cursor.fetchone()
             if not res: return None

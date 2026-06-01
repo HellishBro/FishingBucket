@@ -2,7 +2,7 @@ import random
 
 from ..generic import make_command_group, make_command, Argument
 from ..generic.strategies import Optional
-from ..specific import TemplateStrategy, UnknownPageNumber
+from ..specific import TemplateStrategy, UnknownPageNumber, ProxyStrategy
 
 
 def setup():
@@ -96,6 +96,28 @@ def setup():
                         "\"My Proyx's Naem\"",
                         "\"my poxy'sn ame\""
                     ])
+                )
+            ]
+        )
+    )
+
+    proxy_commands.append(
+        make_command(
+            {
+                "reproxy": [
+                    "rp"
+                ]
+            },
+            "Changes the proxy of your last message in this channel.",
+            """
+            Changes the proxy of your last message in this channel.
+            This will delete and resend your previous proxied message in this channel.
+            Alternatively, reply to a message to reproxy that message instead.
+            """,
+            [
+                Argument(
+                    "new",
+                    ProxyStrategy()
                 )
             ]
         )
