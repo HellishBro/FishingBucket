@@ -1,12 +1,9 @@
 import random
 from typing import Any
 
-import discord
-import fluxer
-
 from .data import Strategy, CharacterStream, ParseError, SyntaxParseError, ParsingArgument, Strategible
 from .misc import lorem_ipsum
-from ...service import Context
+from ...service import Context, Role, Channel, User
 
 
 def strategize(strategy: Strategible) -> Strategy:
@@ -17,12 +14,9 @@ def strategize(strategy: Strategible) -> Strategy:
     elif strategy == str: return StringStrategy()
     elif strategy == bool: return BooleanStrategy()
     elif strategy == hex: return HexadecimalStrategy()
-    elif strategy == fluxer.User: return UserStrategy[fluxer.User]()
-    elif strategy == fluxer.Channel: return ChannelStrategy[fluxer.Channel]()
-    elif strategy == fluxer.Role: return RoleStrategy[fluxer.Role]()
-    elif strategy == discord.User: return UserStrategy[discord.User]()
-    elif strategy == discord.Channel: return ChannelStrategy[discord.Channel]()
-    elif strategy == discord.Role: return RoleStrategy[discord.Role]()
+    elif strategy == User: return UserStrategy()
+    elif strategy == Channel: return ChannelStrategy()
+    elif strategy == Role: return RoleStrategy()
     raise NotImplementedError # should be unreachable
 
 
@@ -298,7 +292,7 @@ class _UseSnowflakeStrategy(Strategy):
         return "snowflake"
 
 
-class UserStrategy[User](_UseSnowflakeStrategy):
+class UserStrategy(_UseSnowflakeStrategy):
     prefix = "@"
 
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> User:
@@ -320,10 +314,10 @@ class UserStrategy[User](_UseSnowflakeStrategy):
         return "@user"
 
 
-class ChannelStrategy[Channel](_UseSnowflakeStrategy):
+class ChannelStrategy(_UseSnowflakeStrategy):
     prefix = "#"
 
-    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> CharacterStream:
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Channel:
         try:
             id_ = await super().parse(stream, argument, context)
             channel = await context.get_channel(id_)
@@ -342,13 +336,13 @@ class ChannelStrategy[Channel](_UseSnowflakeStrategy):
         return "#channel"
 
 
-class RoleStrategy[Role](_UseSnowflakeStrategy):
+class RoleStrategy(_UseSnowflakeStrategy):
     prefix = "@&"
 
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Role:
         try:
             id_ = await super().parse(stream, argument, context)
-            role = await context.get_role(id_)
+            role = await context.guild.get_role(id_)
             if role is not None:
                 return role
 
