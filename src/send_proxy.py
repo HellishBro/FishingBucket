@@ -201,7 +201,7 @@ async def on_user_message(context: Context):
     owner = await get_uid(context)
     guild = Guild(context.guild.id, context.platform)
 
-    roles = (await context.get_member(context.author.id)).roles
+    roles = await (await context.get_member(context.author.id)).roles()
 
     if await Database.instance.get_allow_proxy(
             context.channel.id,

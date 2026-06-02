@@ -167,9 +167,10 @@ class Member(c.Member):
     def display_name(self) -> str:
         return self.raw.display_name
 
-    @property
-    def roles(self) -> list[Role]:
-        return [Role(role, self.bot) for role in self.raw.roles]
+    async def roles(self) -> list[Role]:
+        guild = await self.bot.fetch_guild(str(self.raw.guild_id))
+        roles = await guild.fetch_roles()
+        return [Role([r for r in roles if r.id == role][0], self.bot) for role in self.raw.roles]
 
 
 class Role(c.Role):
@@ -260,7 +261,7 @@ class Message(c.Message):
     async def edit(self, content: str, embeds: list[Embed] = None, **kwargs):
         await self.raw.edit(
             content,
-            embeds=[from_embed(e) for e in embeds or []],
+            embeds=[from_embed(e).to_dict() for e in embeds or []],
             **kwargs
         )
 

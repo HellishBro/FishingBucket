@@ -151,9 +151,8 @@ class Member(ABC):
     @abstractmethod
     def display_name(self) -> str: pass
 
-    @property
     @abstractmethod
-    def roles(self) -> list[Role]: pass
+    async def roles(self) -> list[Role]: pass
 
 
 class Role(ABC):

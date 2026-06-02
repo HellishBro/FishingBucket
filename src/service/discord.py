@@ -165,8 +165,7 @@ class Member(c.Member):
     def display_name(self) -> str:
         return self.raw.display_name
 
-    @property
-    def roles(self) -> list[Role]:
+    async def roles(self) -> list[Role]:
         return [Role(role, self.bot) for role in self.raw.roles]
 
 
