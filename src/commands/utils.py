@@ -27,7 +27,7 @@ def get_smart_pages[T](everything: list[T], function: Callable[[list[T]], tuple[
 def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detailed = False, length_limit = 4096, display_group: bool = True) -> tuple[str, int]:
     def list_fields(prox: Proxy) -> str:
         lns = []
-        if user_preference.public_group or detailed and display_group:
+        if (user_preference.public_group or detailed) and display_group:
             lns.append(f"- Group: {prox.group.name if prox.group else '*N/A*'}")
         if user_preference.public_trigger or detailed:
             lns.append(f"- Triggers: {', '.join(f'`{trigger}`' for trigger in prox.triggers) if prox.triggers and any(bool(t) for t in prox.triggers) else '*N/A*'}")

@@ -105,6 +105,35 @@ def setup():
     proxy_commands.append(
         make_command(
             {
+                "info": [
+                    "i"
+                ]
+            },
+            "Shows you information about a proxy.",
+            """
+            Shows you information about a proxy that you own.
+            If `detailed` is provided, it will ignore your privacy preferences and display everything. This is automatically true in DMs.
+            As of now, this command will not be able to inspect another user's proxies.
+            """,
+            [
+                Argument(
+                    "proxy",
+                    ProxyStrategy()
+                ),
+                Argument(
+                    "detailed",
+                    Optional(
+                        bool,
+                        False
+                    )
+                )
+            ]
+        )
+    )
+
+    proxy_commands.append(
+        make_command(
+            {
                 "reproxy": [
                     "rp"
                 ]

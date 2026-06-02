@@ -5,7 +5,7 @@ from textdistance import damerau_levenshtein as edit_distance
 
 from .generic import hook_command
 from .specific import get_uid
-from .utils import example_trigger_text, paged_proxy_list
+from .utils import example_trigger_text, paged_proxy_list, get_proxies_text
 from ..backend.database import Database, MessageLink
 from ..backend import database as db
 from ..backend.models import Proxy
@@ -106,6 +106,23 @@ def setup():
             context.channel.dm,
             additional_embeds
         )
+
+
+    @hook_command("info")
+    async def _(context: Context, proxy: Proxy, detailed: bool = False):
+        uid = await get_uid(context)
+
+        detailed = context.channel.dm or detailed
+
+        await context.reply("", [Embed(
+            proxy.name,
+            get_proxies_text(
+                [proxy],
+                await Database.instance.get_user_preferences(uid),
+                detailed
+            )[0],
+            thumbnail_url=proxy.effective_avatar
+        )])
 
 
     @hook_command("reproxy")

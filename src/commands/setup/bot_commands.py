@@ -35,7 +35,7 @@ def setup():
     bot_group.append(
         make_command(
             {
-                "stats": ["botinfo", "info"]
+                "stats": ["botinfo"]
             },
             "Get global statistics about the bot.",
             """
