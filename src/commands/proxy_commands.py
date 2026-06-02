@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Literal
 
 from textdistance import damerau_levenshtein as edit_distance
 
@@ -6,10 +7,11 @@ from .generic import hook_command
 from .specific import get_uid
 from .utils import example_trigger_text, paged_proxy_list
 from ..backend.database import Database, MessageLink
+from ..backend import database as db
 from ..backend.models import Proxy
 from ..backend.template_utils import Template
 from ..backend.utils import normalize_emojis
-from ..send_proxy import message_matches_trigger, reproxy
+from ..send_proxy import reproxy
 from ..service import Context, Embed
 
 
@@ -128,3 +130,38 @@ def setup():
 
         await context.message.reference.delete()
         await reproxy(context, old_proxy, proxy)
+
+
+    @hook_command("autoproxy")
+    async def _(context: Context, setting: Proxy | Literal["latch"] | bool, mode: Literal["global"] | Literal["community"] | None, expires: timedelta | Literal["never"]):
+        if setting == "latch":
+            setting = True
+
+        if expires == "never":
+            expiration = None
+        else:
+            expiration = expires.total_seconds()
+
+        if mode == "global" or mode is None:
+            guild = db.Guild(0, context.platform)
+            postfix = "globally"
+        else:
+            guild = db.Guild(context.guild.id, context.platform)
+            postfix = "in this community"
+
+        uid = await get_uid(context)
+
+        if setting is True:
+            await Database.instance.set_autoproxy_preference(uid, guild, None, expiration)
+            await context.reply(f"Autoproxy has been set to latch mode {postfix}.")
+        elif setting is False:
+            if mode is None:
+                await Database.instance.remove_all_autoproxy_preference(uid)
+                await context.reply("Autoproxy has been turned off for everything.")
+                return
+
+            await Database.instance.remove_autoproxy_preference(uid, guild)
+            await context.reply(f"Autoproxy has been turned off {postfix}.")
+        else:
+            await Database.instance.set_autoproxy_preference(uid, guild, setting.id, expiration)
+            await context.reply(f"Autoproxying as **{setting.name}** {postfix}.")

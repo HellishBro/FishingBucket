@@ -13,8 +13,6 @@ from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
 from .backend.utils import mention_message, convert_attachments, normalize_emojis, roll_dice, edit_webhook, \
     get_guild_id_from_channel, send_webhook
-from src.commands.old.utils import get_uid
-from .response import delete_message
 from .service import Platform, Context
 
 

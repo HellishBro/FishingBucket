@@ -1,7 +1,8 @@
 import random
+from datetime import timedelta
 
 from ..generic import make_command_group, make_command, Argument
-from ..generic.strategies import Optional
+from ..generic.strategies import Optional, OneOf, Literal, OptionList
 from ..specific import TemplateStrategy, UnknownPageNumber, ProxyStrategy
 
 
@@ -118,6 +119,62 @@ def setup():
                 Argument(
                     "new",
                     ProxyStrategy()
+                )
+            ]
+        )
+    )
+
+    proxy_commands.append(
+        make_command(
+            {
+                "autoproxy": [
+                    "ap", "auto"
+                ]
+            },
+            "Automatically proxies your messages.",
+            """
+            Automatically proxies your messages.
+            Autoproxy set to `true` or `latch` will proxy your messages as your last used proxy.
+            If `target` is a proxy, all messages will be sent as that proxy.
+            You can still use proxies normally. Any explicit proxy message will override the autoproxy for that message only.
+            If `expiration` is set, then the autoproxy will automatically expire after `expiration` seconds.
+            """,
+            [
+                Argument(
+                    "setting",
+                    OneOf(
+                        bool,
+                        ProxyStrategy(),
+                        Literal(
+                            "latch"
+                        )
+                    )
+                ),
+                Argument(
+                    "mode",
+                    Optional(
+                        OptionList(
+                            None,
+                            [
+                                "global",
+                                "community"
+                            ],
+                            True
+                        ),
+                        None
+                    )
+                ),
+                Argument(
+                    "expiration",
+                    Optional(
+                        OneOf(
+                            timedelta,
+                            Literal(
+                                "never"
+                            )
+                        ),
+                        "never"
+                    )
                 )
             ]
         )

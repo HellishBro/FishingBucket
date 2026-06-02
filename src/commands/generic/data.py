@@ -1,11 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Callable, Any, Literal
 
-import discord
-import fluxer
-
-from ...service import Context
+from ...service import Context, User, Channel, Role
 
 
 class CharacterStream:
@@ -66,11 +64,10 @@ class Strategy(ABC):
 
 type Strategible = (
     Strategy |
-    type[int] | type[float] | type[str] | type[bool] |
+    type[int] | type[float] | type[str] | type[bool] | type[timedelta] |
     range |
     Literal[hex] |
-    fluxer.User | fluxer.Channel | fluxer.Role |
-    discord.User | discord.TextChannel | discord.Role
+    User | Channel | Role
 )
 
 

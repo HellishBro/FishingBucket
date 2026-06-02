@@ -1,5 +1,8 @@
 import random
+from datetime import timedelta
 from typing import Any
+
+import humanfriendly
 
 from .data import Strategy, CharacterStream, ParseError, SyntaxParseError, ParsingArgument, Strategible
 from .misc import lorem_ipsum, escape_string
@@ -14,6 +17,7 @@ def strategize(strategy: Strategible) -> Strategy:
     elif strategy == str: return StringStrategy()
     elif strategy == bool: return BooleanStrategy()
     elif strategy == hex: return HexadecimalStrategy()
+    elif strategy == timedelta: return TimeDeltaStrategy()
     elif strategy == User: return UserStrategy()
     elif strategy == Channel: return ChannelStrategy()
     elif strategy == Role: return RoleStrategy()
@@ -175,6 +179,69 @@ class BooleanStrategy(Strategy):
         return "boolean"
 
 
+class TimeDeltaStrategy(Strategy):
+    def parse_section(self, section: str) -> timedelta:
+        if ":" in section:
+            sections = section.split(":")
+            values = [float(sec) for sec in sections]
+
+            def get_v(index: int) -> float:
+                if len(values) > index:
+                    return values[- index - 1]
+                return 0
+
+            return timedelta(
+                seconds=get_v(0),
+                minutes=get_v(1),
+                hours=get_v(2),
+                days=get_v(3)
+            )
+
+        else:
+            return timedelta(seconds=humanfriendly.parse_timespan(section))
+
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> timedelta:
+        string = await StringStrategy().parse(stream, argument, context)
+        try:
+            if "," in string:
+                deltas = timedelta(seconds=0)
+                for section in string.split(","):
+                    deltas += self.parse_section(section)
+                return deltas
+            return self.parse_section(string)
+        except humanfriendly.InvalidTimespan:
+            raise SyntaxParseError(f"cannot parse timestamp")
+
+    def example(self) -> str:
+        td = timedelta(seconds=random.randint(10, 3600 * 24 * 14))
+        return escape_string(random.choice([
+            humanfriendly.format_timespan(td),
+            str(td)
+        ]))
+
+    def get_placeholder_text(self) -> str:
+        return "duration"
+
+
+class Literal(Strategy):
+    def __init__(self, literal: Any, placeholder_text: str = None, strat: Strategible = None):
+        self.literal = literal
+        self.placeholder_text = placeholder_text or repr(str(literal))
+        self.strat = strategize(strat or type(self.literal))
+
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any:
+        parse = self.strat.parse(stream, argument, context)
+        if parse != self.literal:
+            raise SyntaxParseError(f"expected literal {self.literal!r}")
+        return parse
+
+    def example(self) -> str:
+        return self.literal
+
+    def get_placeholder_text(self) -> str:
+        return self.placeholder_text
+
+
 class OneOf(Strategy):
     def __init__(self, *strats: Strategible):
         self.strats = [strategize(strat) for strat in strats]
@@ -220,7 +287,7 @@ class OptionList(Strategy):
         return random.choice([*self.options.keys()])
 
     def get_placeholder_text(self) -> str:
-        return self.options_name or "options"
+        return self.options_name or " OR ".join(Literal(option).get_placeholder_text() for option in self.options.keys())
 
 
 class Optional(Strategy):
