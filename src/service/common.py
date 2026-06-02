@@ -216,6 +216,10 @@ class Message(ABC):
 
     @property
     @abstractmethod
+    def channel_id(self) -> int: pass
+
+    @property
+    @abstractmethod
     def guild(self) -> Guild: pass
 
     @property

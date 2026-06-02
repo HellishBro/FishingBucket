@@ -227,6 +227,10 @@ class Message(c.Message):
         return Channel(self.raw.channel, self.bot)
 
     @property
+    def channel_id(self) -> int:
+        return self.raw.channel.id
+
+    @property
     def guild(self) -> Guild:
         return Guild(self.raw.guild, self.bot)
 
@@ -333,7 +337,7 @@ class Webhook(c.Webhook):
         )
 
     async def get_message_data(self, context: Context) -> Message:
-        actual_contents = context.content.split("\n", maxsplit=1)[1]
+        actual_contents = context.content
         actual_embeds = [embed for embed in context.message.embeds if embed.title != "Reply"]
         referenced_message_embeds = [embed for embed in context.message.embeds if embed.title == "Reply"]
         referenced_message = None
@@ -343,6 +347,7 @@ class Webhook(c.Webhook):
             _, message_id = match.groups()
             message_id = int(message_id)
             referenced_message = await context.channel.get_message(message_id)
+            actual_contents = context.content.split("\n", maxsplit=1)[1]
 
         class M(Message):
             @property

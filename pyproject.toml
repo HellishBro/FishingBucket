@@ -16,4 +16,5 @@ dependencies = [
     "py-cord>=2.8.0",
     "lorem-text>=3.0",
     "humanfriendly>=10.0",
+    "mypy>=1.11",
 ]

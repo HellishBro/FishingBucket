@@ -231,6 +231,10 @@ class Message(c.Message):
         return Channel(self.raw.channel, self.bot)
 
     @property
+    def channel_id(self) -> int:
+        return self.raw.channel_id
+
+    @property
     def guild(self) -> Guild:
         return Guild(self.raw.guild, self.bot)
 

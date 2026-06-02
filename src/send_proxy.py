@@ -219,18 +219,18 @@ async def on_user_message(context: Context):
         if proxied:
             logging_channel: Channel | None | Literal[False] = None
             proxy = None
-            msg = None
+            ctx = None
 
             for i, (proxy, m) in enumerate(proxied):
                 try:
                     try:
-                        msg = await send_proxy_message(proxy, m, context, context.message.attachments, True, i == 0)
+                        ctx = await send_proxy_message(proxy, m, context, context.message.attachments, True, i == 0)
                     except Exception as e:
                         await context.reply(f"Messages could not be proxied! `{e}`")
                         return
 
-                    if msg:
-                        await Database.instance.link_message(msg.id, msg.channel.id, proxy.id, context.author.id, context.platform) # TODO: this will error because msg.channel is unset from API. fix pending
+                    if ctx:
+                        await Database.instance.link_message(ctx.id, ctx.message.channel_id, proxy.id, context.author.id, context.platform)
 
                     if logging_channel is None:
                         server_preferences: GuildPreference = await Database.instance.get_guild_preferences(guild)
@@ -241,8 +241,8 @@ async def on_user_message(context: Context):
                             logging_channel = False
 
                     if logging_channel:
-                        if msg:
-                            message_link = msg.message.mention
+                        if ctx:
+                            message_link = ctx.message.mention
                             reply_msg = f"**Replying To**: [message link]({context.message.reference.mention})\n" if context.message.reference and i == 0 else ""
                             embed = Embed(
                                 f"Proxied Message",
@@ -253,7 +253,7 @@ async def on_user_message(context: Context):
 
                 except Exception as e:
                     print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
-                    if not msg:
+                    if not ctx:
                         await context.reply(f"Messages could not be proxied! `{e}`")
                         return
 
