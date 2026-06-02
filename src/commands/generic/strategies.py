@@ -183,7 +183,7 @@ class TimeDeltaStrategy(Strategy):
     def parse_section(self, section: str) -> timedelta:
         if ":" in section:
             sections = section.split(":")
-            values = [float(sec) for sec in sections]
+            values = [float(sec.strip()) for sec in sections]
 
             def get_v(index: int) -> float:
                 if len(values) > index:
@@ -203,10 +203,11 @@ class TimeDeltaStrategy(Strategy):
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> timedelta:
         string = await StringStrategy().parse(stream, argument, context)
         try:
-            if "," in string:
+            if "," in string or "and" in string:
                 deltas = timedelta(seconds=0)
-                for section in string.split(","):
-                    deltas += self.parse_section(section)
+                for section in string.replace("and", ",").split(","):
+                    if section.strip():
+                        deltas += self.parse_section(section.strip())
                 return deltas
             return self.parse_section(string)
         except humanfriendly.InvalidTimespan:
