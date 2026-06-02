@@ -112,6 +112,9 @@ class Channel(c.Channel):
     async def delete_message(self, message_id: int):
         await self.raw.delete_messages([message_id])
 
+    async def create_webhook(self, name: str) -> Webhook:
+        return Webhook(await self.bot.create_webhook(str(self.id), name=name), self.bot)
+
 
 class Guild(c.Guild):
     raw: fluxer.Guild
@@ -340,6 +343,9 @@ class Webhook(c.Webhook):
         return Message(fluxer.Message.from_data(data, self.raw._http), self.bot).context
 
     async def edit(self, context: Context, content: str, embeds: list[Embed] = None, **kwargs):
+        if context.message.reference:
+           content = context.content.split("\n")[0] + content
+
         await self.raw._http.request(
             fhttp.Route("PATCH", "/webhooks/{wid}/{wtk}/messages/{mid}", wid=self.id, wtk=self.token, mid=context.id),
             json={
@@ -348,7 +354,7 @@ class Webhook(c.Webhook):
             }
         )
 
-    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, **kwargs) -> Context:
+    async def reply_internal(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None) -> Context:
         if not self.raw._http:
             raise RuntimeError("Cannot send with webhook without HTTPClient")
 
@@ -403,8 +409,21 @@ class Webhook(c.Webhook):
 
         return Message(fluxer.Message.from_data(data, self.raw._http), self.bot).context
 
+    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, mention_str: str = None) -> Context:
+        mention_str = mention_str or context.author.mention
+        return await self.reply_internal(context, f"-# ↩ {mention_str}\n{content}", username, avatar_url, mention, embeds, files)
+
     async def get_message_data(self, context: Context) -> Message:
-        return context.message
+        actual_contents = context.content
+        if context.message.reference:
+            actual_contents = context.content.split("\n", maxsplit=1)[1]
+
+        class M(Message):
+            @property
+            def content(self) -> str:
+                return actual_contents
+
+        return M(context.message.raw, self.bot)
 
 
 class Bot(c.Bot):
@@ -422,6 +441,12 @@ class Bot(c.Bot):
     @property
     def guilds(self) -> list[Guild]:
         return [Guild(guild, self.bot) for guild in self.raw.guilds]
+
+    async def get_webhook(self, webhook_id: int) -> Webhook | None:
+        try:
+            return Webhook(await self.bot.fetch_webhook(str(webhook_id)), self.bot)
+        except fluxer.HTTPException:
+            return None
 
 
 class ReactionActionEvent(c.ReactionActionEvent):
@@ -504,3 +529,7 @@ class Context(c.Context):
             return Channel(await self.bot.fetch_channel(str(channel_id)), self.bot)
         except fluxer.NotFound:
             return None
+
+    @property
+    def get_bot(self) -> Bot:
+        return Bot(self.bot, self.bot)

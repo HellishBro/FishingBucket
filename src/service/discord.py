@@ -110,6 +110,10 @@ class Channel(c.Channel):
     async def delete_message(self, message_id: int):
         await self.raw.delete_messages([discord.Object(message_id)])
 
+    async def create_webhook(self, name: str) -> Webhook:
+        webhook = await self.raw.create_webhook(name=name)
+        return Webhook(webhook, self.bot)
+
 
 class Guild(c.Guild):
     raw: discord.Guild
@@ -311,11 +315,11 @@ class Webhook(c.Webhook):
     REPLY_DESCRIPTION_REGEX = re.compile(r"\[Replying to]\(https://discord\.com/channels/(?:\d+?|@me)/\d+?/(\d+?)\) .+?:")
 
 
-    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, **kwargs) -> Context:
-        mention_str = kwargs.get('mention_string', context.author.mention)
+    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, mention_str: str = None) -> Context:
+        mention_str = mention_str or context.author.mention
         return await self.send(
             f"-# ↩ {mention_str}\n{content}",
-            username, avatar_url, mention, self.transform_embeds(embeds, context), files, **kwargs
+            username, avatar_url, mention, self.transform_embeds(embeds, context), files
         )
 
     async def edit(self, context: Context, content: str, embeds: list[Embed] = None, **kwargs):
@@ -372,6 +376,12 @@ class Bot(c.Bot):
     @property
     def guilds(self) -> list[Guild]:
         return [Guild(guild, self.bot) for guild in self.raw.guilds]
+
+    async def get_webhook(self, webhook_id: int) -> Webhook | None:
+        try:
+            return Webhook(await self.raw.fetch_webhook(webhook_id), self.bot)
+        except discord.HTTPException:
+            return None
 
 
 class ReactionActionEvent(c.ReactionActionEvent):
@@ -454,3 +464,7 @@ class Context(c.Context):
             return Channel(await self.bot.fetch_channel(channel_id), self.bot)
         except discord.HTTPException:
             return None
+
+    @property
+    def get_bot(self) -> Bot:
+        return Bot(self.bot, self.bot)

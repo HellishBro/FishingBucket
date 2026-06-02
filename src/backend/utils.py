@@ -11,6 +11,7 @@ import expr_dice_roller as dice
 
 from .cache import TTLCache
 from .data_reader import DataReader
+from ..service import Attachment, File, Embed
 
 
 def format_date(dt: datetime):
@@ -116,25 +117,14 @@ async def compute_permissions(member: fluxer.models.GuildMember, bot: fluxer.Bot
     base_permissions = await compute_base_permissions(member, await bot.fetch_guild(str(channel.guild_id)))
     return await compute_overwrites(base_permissions, bot, member, channel)
 
-async def get_member(guild_id: int, bot: fluxer.Bot, user_id: int) -> fluxer.models.GuildMember:
-    return fluxer.models.GuildMember.from_data(await bot._http.request(fhttp.Route("GET", "/guilds/{gid}/members/{uid}", gid=str(guild_id), uid=str(user_id))), bot._http)
 
-
-async def edit_webhook(webhook: fluxer.Webhook, bot: fluxer.Bot, message: fluxer.Message, new_contents: str, embeds: list[dict] | None) -> fluxer.Message:
-    return fluxer.Message.from_data(
-        await bot._http.request(fhttp.Route("PATCH", "/webhooks/{wid}/{wtk}/messages/{mid}", wid=webhook.id, wtk=webhook.token, mid=message.id), json={
-            "content": new_contents,
-            "embeds": embeds or []
-        }),
-        bot._http
-    )
-
-async def convert_attachments(message_attachments: list[fluxer.models.Attachment]) -> list[fluxer.File]:
+async def convert_attachments(message_attachments: list[Attachment]) -> list[File]:
     parsed_attachments = []
     for attachment in message_attachments:
-        parsed_attachments.append(fluxer.File(
-            BytesIO(await read_file_blob(attachment.url)),
-            filename=attachment.filename
+        parsed_attachments.append(File(
+            attachment.filename,
+            "",
+            await attachment.read()
         ))
     return parsed_attachments
 
@@ -143,81 +133,23 @@ def normalize_emojis(text: str) -> str:
         text = text.replace(":" + key + ":", emoji)
     return text
 
-def roll_dice(string: str, get_global_environment, set_global_environment) -> tuple[str, fluxer.Embed]:
+def roll_dice(string: str, get_global_environment, set_global_environment) -> tuple[str, Embed]:
     try:
         rep = dice.format_expression(string)[:100]
         try:
             res = dice.evaluate(string, get_global_environment(), True)
             set_global_environment(res.environment)
             if res.value is None:
-                embed = fluxer.Embed(rep, f"{res.representation}")
+                embed = Embed(rep, f"{res.representation}", "dice roll")
                 ret = "no value"
             else:
-                embed = fluxer.Embed(rep, f"`{res.representation[:1000]}` = {res.value:g}")
+                embed = Embed(rep, f"`{res.representation[:1000]}` = {res.value:g}", "dice roll")
                 ret = f"{res.value:g}"
         except ValueError as e:
-            embed = fluxer.Embed(rep, f"Error: {e.args[0]}")
+            embed = Embed(rep, f"Error: {e.args[0]}", "dice roll")
             ret = "error"
     except ValueError as e:
-        embed = fluxer.Embed(string[:100], f"Error: {e.args[0]}")
+        embed = Embed(string[:100], f"Error: {e.args[0]}", "dice roll")
         ret = "error"
-    embed.set_footer(text="dice roll")
     return ret, embed
 
-async def send_webhook(webhook: fluxer.Webhook, content: str, *, embeds: list[dict] = None, username: str = None, avatar_url: str = None, files: list[fluxer.File] = None, wait: bool = False, message_reference: fluxer.Message, mention: bool = True) -> fluxer.Message | None:
-    if not webhook._http:
-        raise RuntimeError("Cannot send with webhook without HTTPClient")
-
-    files = files or []
-
-    route = webhook._http._route(
-        "POST",
-        "/webhooks/{webhook_id}/{token}",
-        webhook_id=webhook.id,
-        token=webhook.token,
-    )
-    payload: dict[str, Any] = {}
-    if content is not None:
-        payload["content"] = content
-    if embeds is not None:
-        payload["embeds"] = embeds
-    if username is not None:
-        payload["username"] = username
-    if avatar_url is not None:
-        payload["avatar_url"] = avatar_url
-    if message_reference is not None:
-        payload["message_reference"] = {
-            "message_id": str(message_reference.id)
-        }
-    if mention:
-        payload["allowed_mentions"] = {
-            "parse": ["users"]
-        }
-    params = {"wait": "true"} if wait else None
-    if files:
-        form = aiohttp.FormData()
-        payload["attachments"] = [
-            {"id": i, "filename": file.filename} for i, file in enumerate(files)
-        ]
-        form.add_field(
-            "payload_json",
-            json.dumps(payload),
-            content_type="application/json",
-        )
-        for i, file in enumerate(files):
-            form.add_field(
-                f"files[{i}]",
-                file._get_bytes(),
-                filename=file.filename,
-            )
-        data = await webhook._http.request(route, data=form, params=params)
-    else:
-        data = await webhook._http.request(
-            route,
-            json=payload,
-            params=params,
-        )
-
-    if data is not None:
-        return fluxer.Message.from_data(data, webhook._http)
-    return None

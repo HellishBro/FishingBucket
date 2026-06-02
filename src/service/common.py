@@ -104,6 +104,9 @@ class Channel(ABC):
     @abstractmethod
     async def delete_message(self, message_id: int): pass
 
+    @abstractmethod
+    async def create_webhook(self, name: str) -> Webhook: pass
+
 
 class Guild(ABC):
     def __init__(self, raw, bot):
@@ -268,7 +271,7 @@ class Webhook(ABC):
     async def edit(self, context: Context, content: str, embeds: list[Embed] = None, **kwargs): pass
 
     @abstractmethod
-    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, **kwargs) -> Context: pass
+    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, mention_str: str = None) -> Context: pass
 
     @abstractmethod
     async def get_message_data(self, context: Context) -> Message: pass
@@ -290,6 +293,9 @@ class Bot(ABC):
     @property
     @abstractmethod
     def guilds(self) -> list[Guild]: pass
+
+    @abstractmethod
+    async def get_webhook(self, webhook_id: int) -> Webhook | None: pass
 
 
 class ReactionActionEvent(ABC):
@@ -353,3 +359,7 @@ class Context(ABC):
 
     @abstractmethod
     async def get_channel(self, channel_id: int) -> Channel | None: pass
+
+    @property
+    @abstractmethod
+    def get_bot(self) -> Bot: pass

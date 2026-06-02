@@ -2,6 +2,7 @@ import discord
 import fluxer
 
 from ..interaction import Interactions
+from ..send_proxy import on_user_message
 from ..service import Context, Platform, Server, FluxerServer, DiscordServer, FluxerContext, DiscordContext, ReactionActionEvent
 from ..service.fluxer import Message as FluxerMessage, ReactionActionEvent as FluxerReactionActionEvent
 from ..service.discord import Message as DiscordMessage, ReactionActionEvent as DiscordReactionActionEvent
@@ -16,10 +17,14 @@ async def handle_message(context: Context):
         cmd = await get_command_awaitable(context, Config.instance.prefixes)
         if cmd:
             await cmd
+            return
     except ParseError as e:
         await context.reply(f"Error parsing command: {e.message}.\nUse `{Config.instance.prefixes[0]}help` to see command shape.")
+        return
     except EarlyExitException:
-        pass
+        return
+
+    await on_user_message(context)
 
 
 async def handle_reaction(context: ReactionActionEvent, server: Server):

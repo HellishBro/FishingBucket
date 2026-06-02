@@ -47,7 +47,7 @@ def setup():
                     "stat",
                     Optional(
                         OptionList(
-                            None,
+                            "stat",
                             [
                                 "proxy_uses",
                                 "guilds",
