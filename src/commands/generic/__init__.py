@@ -115,8 +115,10 @@ async def get_command_awaitable(context: Context, prefixes: list[str]) -> Corout
         if context.content.startswith(prefix):
             sans_prefix = context.content[len(prefix):].strip()
             for name, command in command_registry.items():
-                if any(sans_prefix.lower().startswith((matched_name := n).lower()) for n in sorted([command.canonical_name] + command.aliases, key=len, reverse=True)):
-                    arguments = await parse_command_arguments(sans_prefix[len(matched_name):].strip(), command.arguments, context)
-                    session_command_usages += 1
-                    return command_hooks[name, context.platform](context, *arguments)
+                if any(sans_prefix.lower().startswith((matched_name := a).lower()) for a in [name] + [*sorted([alias.lower() for alias in command.aliases], key=len, reverse=True)]):
+                    command_part = sans_prefix[len(matched_name):]
+                    if command_part == "" or command_part[0] == " ":
+                        arguments = await parse_command_arguments(command_part.strip(), command.arguments, context)
+                        session_command_usages += 1
+                        return command_hooks[name, context.platform](context, *arguments)
     return None

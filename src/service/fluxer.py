@@ -105,7 +105,7 @@ class Channel(c.Channel):
 
     async def get_message(self, message_id: int) -> Message | None:
         try:
-            return await self.raw.fetch_message(message_id)
+            return Message(await self.raw.fetch_message(message_id), self.bot)
         except fluxer.NotFound:
             return None
 
@@ -410,9 +410,9 @@ class Webhook(c.Webhook):
 
         return Message(fluxer.Message.from_data(data, self.raw._http), self.bot).context
 
-    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, mention_str: str = None) -> Context:
+    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, mention_str: str | Literal[False] = None) -> Context:
         mention_str = mention_str or context.author.mention
-        return await self.reply_internal(context, f"-# ↩ {mention_str}\n{content}", username, avatar_url, mention, embeds, files)
+        return await self.reply_internal(context, f"-# ↩ {mention_str}\n{content}" if mention_str is not False else content, username, avatar_url, mention, embeds, files)
 
     async def get_message_data(self, context: Context) -> Message:
         actual_contents = context.content

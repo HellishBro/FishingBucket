@@ -12,7 +12,7 @@ from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
 from .backend.utils import convert_attachments, normalize_emojis, roll_dice
 from .commands.specific import get_uid
-from .service import Platform, Context, Webhook, Attachment, Embed, Channel
+from .service import Platform, Context, Webhook, Attachment, Embed, Channel, Message
 
 
 def message_matches_trigger(message: str, triggers: list[str]) -> tuple[bool, str]:
@@ -135,33 +135,38 @@ async def modify_message(user: int, guild_preferences: GuildPreference, message:
 
 
 async def reproxy(context: Context, old_proxy: Proxy, new_proxy: Proxy):
-    contents = context.content
-    attachments = context.message.attachments
-    embeds = context.message.embeds
-    parent_message = context.message.reference
-    webhook = await get_webhook(old_message.channel_id, bot)
-    server_preferences = await Database.instance.get_guild_preferences(Guild((await bot.fetch_channel(str(old_message.channel_id))).guild_id, Platform.Fluxer))
-    await old_message.delete()
-    await Database.instance.delete_link_message(old_message.id, old_message.channel_id)
-    contents, embeds = await modify_message(new_proxy.owner, server_preferences, contents, embeds)
-    m = await send_webhook(
-        webhook, contents,
-        embeds=embeds, username=new_proxy.effective_name, avatar_url=new_proxy.effective_avatar,
-        files=await convert_attachments(attachments), wait=True, message_reference=parent_message,
-        mention=bool(old_message.mentions)
-    )
+    webhook: Webhook = await get_webhook(context)
+    fixed_message = await webhook.get_message_data(context)
+    contents = fixed_message.content
+    attachments = fixed_message.attachments
+    embeds = fixed_message.embeds
+    parent_message = fixed_message.reference
+    guild = Guild(context.channel.guild.id, context.platform)
+    server_preferences = await Database.instance.get_guild_preferences(guild)
+    print(context.content)
+    await context.message.delete()
+    await Database.instance.delete_link_message(context.message.id, context.channel.id)
+    if parent_message:
+        m = await webhook.reply(
+            parent_message.context, contents, new_proxy.effective_name, new_proxy.effective_avatar, True, embeds,
+            await convert_attachments(attachments), False
+        )
+    else:
+        m = await webhook.send(
+            contents, new_proxy.effective_name, new_proxy.effective_avatar, True, embeds, await convert_attachments(attachments)
+        )
+
     await Database.instance.transfer_proxy_usage(old_proxy.id, new_proxy.id)
-    await Database.instance.set_autoproxy_last_used_proxy(old_proxy.owner, Guild(await get_guild_id_from_channel(bot, old_message.channel_id), Platform.Fluxer), new_proxy.id)
-    await Database.instance.link_message(m.id, m.channel_id, new_proxy.id, platform_user, platform)
+    await Database.instance.set_autoproxy_last_used_proxy(old_proxy.owner, guild, new_proxy.id)
+    await Database.instance.link_message(m.id, context.channel.id, new_proxy.id, context.author.id, context.platform)
     logging_channel_id = server_preferences.logging_channel
     if logging_channel_id != 0:
-        logging_channel = await bot.fetch_channel(str(logging_channel_id))
-        message_link = await mention_message(bot, m)
-        embed = fluxer.Embed(
+        logging_channel = await context.get_channel(logging_channel_id)
+        embed = Embed(
             f"Message Proxy Change",
-            f"**Previous Proxy**: {old_proxy.effective_name}\n**New Proxy**: {new_proxy.effective_name}\n**Owner**: <@{old_message.author.id}> (`{old_message.author.id}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**New Message Link**: [jump]({message_link})"
+            f"**Previous Proxy**: {old_proxy.effective_name}\n**New Proxy**: {new_proxy.effective_name}\n**Owner**: {context.author.mention} (`{context.author.id}`)\n**Channel**: {context.channel.mention} (`{context.channel.id}`)\n**New Message Link**: [jump]({m.message.mention})",
+            thumbnail_url=new_proxy.effective_avatar
         )
-        embed.set_thumbnail(url=new_proxy.effective_avatar)
         await logging_channel.send("", embeds=[embed])
 
 
@@ -225,7 +230,7 @@ async def on_user_message(context: Context):
                         return
 
                     if msg:
-                        await Database.instance.link_message(msg.id, msg.channel.id, proxy.id, context.author.id, context.platform)
+                        await Database.instance.link_message(msg.id, msg.channel.id, proxy.id, context.author.id, context.platform) # TODO: this will error because msg.channel is unset from API. fix pending
 
                     if logging_channel is None:
                         server_preferences: GuildPreference = await Database.instance.get_guild_preferences(guild)
@@ -247,9 +252,9 @@ async def on_user_message(context: Context):
                             await logging_channel.send("", [embed])
 
                 except Exception as e:
+                    print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
                     if not msg:
                         await context.reply(f"Messages could not be proxied! `{e}`")
-                        print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
                         return
 
                 await Database.instance.use_proxy(proxy.id)

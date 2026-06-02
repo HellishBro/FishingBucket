@@ -131,9 +131,10 @@ def setup():
 
         if context.message.reference:
             message_id = context.message.reference.id
+            message = context.message.reference
         else:
             message_id = await Database.instance.get_latest_proxy_message_from_user(context.channel.id, owner, context.platform)
-            if not message_id:
+            if (message := await context.channel.get_message(message_id)) is None or not message_id:
                 await context.reply("Error: there are no previous proxied messages from you in this channel!")
                 return
 
@@ -145,8 +146,8 @@ def setup():
             await context.reply("Error: you do not own the original proxy!")
             return
 
-        await context.message.reference.delete()
-        await reproxy(context, old_proxy, proxy)
+        await context.message.delete()
+        await reproxy(message.context, old_proxy, proxy)
 
 
     @hook_command("autoproxy")

@@ -314,10 +314,10 @@ class Webhook(c.Webhook):
     REPLY_DESCRIPTION_REGEX = re.compile(r"\[Replying to]\(https://discord\.com/channels/(?:\d+?|@me)/\d+?/(\d+?)\) .+?:")
 
 
-    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, mention_str: str = None) -> Context:
+    async def reply(self, context: Context, content: str, username: str = None, avatar_url: str = None, mention: bool = False, embeds: list[Embed] = None, files: list[File] = None, mention_str: str | Literal[False] = None) -> Context:
         mention_str = mention_str or context.author.mention
         return await self.send(
-            f"-# ↩ {mention_str}\n{content}",
+            f"-# ↩ {mention_str}\n{content}" if mention_str is not False else content,
             username, avatar_url, mention, self.transform_embeds(embeds, context), files
         )
 
