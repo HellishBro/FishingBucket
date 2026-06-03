@@ -247,7 +247,9 @@ class Message(c.Message):
         return f"https://web.fluxer.app/channels/{self.guild.id if not self.channel.dm else '@me'}/{self.channel.id}/{self.id}"
 
     @property
-    def reference(self) -> Message | None:
+    def has_reference(self) -> bool: return self.raw.referenced_message is not None
+
+    async def get_reference(self) -> Message | None:
         return Message(self.raw.referenced_message, self.bot) if self.raw.referenced_message else None
 
     async def delete(self):
@@ -348,7 +350,7 @@ class Webhook(c.Webhook):
         return Message(fluxer.Message.from_data(data, self.raw._http), self.bot).context
 
     async def edit(self, context: Context, content: str, embeds: list[Embed] = None, **kwargs):
-        if context.message.reference:
+        if context.message.has_reference:
            content = context.content.split("\n")[0] + content
 
         await self.raw._http.request(
@@ -420,7 +422,7 @@ class Webhook(c.Webhook):
 
     async def get_message_data(self, context: Context) -> Message:
         actual_contents = context.content
-        if context.message.reference:
+        if context.message.has_reference:
             actual_contents = context.content.split("\n", maxsplit=1)[1]
 
         class M(Message):

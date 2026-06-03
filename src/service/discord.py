@@ -243,8 +243,18 @@ class Message(c.Message):
         return f"https://discord.com/channels/{self.guild.id if not self.channel.dm else '@me'}/{self.channel.id}/{self.id}"
 
     @property
-    def reference(self) -> Message | None:
-        d = self.raw.reference.cached_message if self.raw.reference else None
+    def has_reference(self) -> bool: return self.raw.reference is not None
+
+    async def get_reference(self) -> Message | None:
+        d = None
+        if self.raw.reference:
+            if self.raw.reference.cached_message:
+                d = self.raw.reference.cached_message
+            else:
+                try:
+                    d = await (await self.bot.fetch_channel(self.raw.reference.channel_id)).fetch_message(self.raw.reference.message_id)
+                except discord.HTTPException: pass
+
         return Message(d, self.bot) if d else None
 
     async def delete(self):
@@ -327,7 +337,7 @@ class Webhook(c.Webhook):
 
     async def edit(self, context: Context, content: str, embeds: list[Embed] = None, **kwargs):
         data = (await self.get_message_data(context)).context
-        if data.message.reference:
+        if data.message.has_reference:
            content = context.content.split("\n")[0] + content
         await self.raw.edit_message(
             context.id,

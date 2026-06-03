@@ -6,7 +6,7 @@ import re
 
 from .backend.cache import TTLCache
 from .backend.config import Config
-from .backend.database import Database, GuildPreference, UserAutoproxyPreference, Guild
+from .backend.database import Database, GuildPreference, UserAutoproxyPreference, Guild, MessageLink
 from .backend.models import Proxy
 from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
@@ -75,19 +75,21 @@ async def send_proxy_message(proxy: Proxy, message: str, context: Context, attac
     webhook: Webhook = await get_webhook(context)
 
     mention_str = None
-    if context.message.reference:
-        lnk = await Database.instance.get_message_link(context.message.reference.id, context.channel.id)
+    ref = await context.message.get_reference()
+
+    if ref:
+        lnk = await Database.instance.get_message_link(ref.id, ref.channel_id)
         if lnk:
             parent_proxy = await Database.instance.get_proxy(lnk.proxy_id)
             mention_str = f"{parent_proxy.name} (<@{lnk.platform_user}>)"
         else:
-            mention_str = context.message.reference.author.mention
+            mention_str = ref.author.mention
 
     message, embeds = await modify_message(proxy.owner, await Database.instance.get_guild_preferences(Guild(context.guild.id, context.platform)), message, [])
 
-    if context.message.reference and do_reply:
+    if ref and do_reply:
         return await webhook.reply(
-            context.message.reference.context, message, proxy.effective_name, proxy.effective_avatar, mention, embeds,
+            ref.context, message, proxy.effective_name, proxy.effective_avatar, mention, embeds,
             await convert_attachments(attachments), mention_str
         )
 
@@ -140,10 +142,10 @@ async def reproxy(context: Context, old_proxy: Proxy, new_proxy: Proxy):
     contents = fixed_message.content
     attachments = fixed_message.attachments
     embeds = fixed_message.embeds
-    parent_message = fixed_message.reference
+    parent_message = await fixed_message.get_reference()
+    previous_link: MessageLink = await Database.instance.get_message_link(context.message.id, context.message.channel_id)
     guild = Guild(context.channel.guild.id, context.platform)
     server_preferences = await Database.instance.get_guild_preferences(guild)
-    print(context.content)
     await context.message.delete()
     await Database.instance.delete_link_message(context.message.id, context.channel.id)
     if parent_message:
@@ -158,7 +160,7 @@ async def reproxy(context: Context, old_proxy: Proxy, new_proxy: Proxy):
 
     await Database.instance.transfer_proxy_usage(old_proxy.id, new_proxy.id)
     await Database.instance.set_autoproxy_last_used_proxy(old_proxy.owner, guild, new_proxy.id)
-    await Database.instance.link_message(m.id, context.channel.id, new_proxy.id, context.author.id, context.platform)
+    await Database.instance.link_message(m.id, context.channel.id, new_proxy.id, previous_link.platform_user, context.platform)
     logging_channel_id = server_preferences.logging_channel
     if logging_channel_id != 0:
         logging_channel = await context.get_channel(logging_channel_id)
@@ -243,7 +245,8 @@ async def on_user_message(context: Context):
                     if logging_channel:
                         if ctx:
                             message_link = ctx.message.mention
-                            reply_msg = f"**Replying To**: [message link]({context.message.reference.mention})\n" if context.message.reference and i == 0 else ""
+                            ref = await context.message.get_reference()
+                            reply_msg = f"**Replying To**: [message link]({ref.mention})\n" if ref and i == 0 else ""
                             embed = Embed(
                                 f"Proxied Message",
                                 f"**Proxy**: {proxy.effective_name}\n**Owner**: {context.author.mention} (`{context.author.id}`)\n**Channel**: {context.channel.mention} (`{context.channel.id}`)\n**Message Link**: [jump]({message_link})\n{reply_msg}**Message**:\n{'\n'.join('> ' + line for line in m.split('\n'))}",

@@ -208,3 +208,16 @@ def setup():
             ]
         )
     )
+
+    proxy_commands.append(
+        make_command(
+            "who",
+            "Shows you information about a proxied message.",
+            """
+            Shows you information about a proxied message.
+            This requires the command to be a reply to a message sent by a proxy.
+            Alternatively, react to a proxied message with :question: to do the same thing!
+            """,
+            []
+        )
+    )

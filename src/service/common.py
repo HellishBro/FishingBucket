@@ -232,7 +232,10 @@ class Message(ABC):
 
     @property
     @abstractmethod
-    def reference(self) -> Message | None: pass
+    def has_reference(self) -> bool: pass
+
+    @abstractmethod
+    async def get_reference(self) -> Message | None: pass
 
     @abstractmethod
     async def delete(self): pass

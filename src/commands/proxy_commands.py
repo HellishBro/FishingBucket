@@ -12,7 +12,7 @@ from ..backend.models import Proxy
 from ..backend.template_utils import Template
 from ..backend.utils import normalize_emojis
 from ..send_proxy import reproxy
-from ..service import Context, Embed
+from ..service import Context, Embed, Webhook
 
 
 def setup():
@@ -129,9 +129,9 @@ def setup():
     async def _(context: Context, proxy: Proxy):
         owner = await get_uid(context)
 
-        if context.message.reference:
-            message_id = context.message.reference.id
-            message = context.message.reference
+        if ref := await context.message.get_reference():
+            message_id = ref.id
+            message = ref
         else:
             message_id = await Database.instance.get_latest_proxy_message_from_user(context.channel.id, owner, context.platform)
             if (message := await context.channel.get_message(message_id)) is None or not message_id:
@@ -183,3 +183,25 @@ def setup():
         else:
             await Database.instance.set_autoproxy_preference(uid, guild, setting.id, expiration)
             await context.reply(f"Autoproxying as **{setting.name}** {postfix}.")
+
+
+    @hook_command("who")
+    async def _(context: Context):
+        if not (ref := await context.message.get_reference()):
+            await context.reply("Error: reply to a proxied message to use this command.")
+            return
+
+        lnk = await Database.instance.get_message_link(ref.id, ref.channel_id)
+        if lnk:
+            if proxy := await Database.instance.get_proxy(lnk.proxy_id):
+                e = Embed(
+                    "Proxied Message",
+                    f"**Proxy**: {proxy.name}\n**Owner**: <@{lnk.platform_user}> (`{lnk.platform_user}`)\n**Message Link**: [link]({ref.mention})\n**Message**:\n{'\n'.join(('> ' + ln) for ln in ref.content.split('\n'))}"
+                )
+                dm = await context.author.get_dm()
+                await dm.send("", [e])
+                await context.message.delete()
+                return
+
+        await context.reply("That message is not a proxied message!")
+
