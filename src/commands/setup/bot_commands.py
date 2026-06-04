@@ -34,6 +34,17 @@ def setup():
 
     bot_group.append(
         make_command(
+            "explain",
+            "What do I do?",
+            """
+            What do I do?
+            """,
+            []
+        )
+    )
+
+    bot_group.append(
+        make_command(
             {
                 "stats": ["botinfo"]
             },

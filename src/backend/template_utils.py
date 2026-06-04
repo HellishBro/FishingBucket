@@ -3,6 +3,8 @@ import celpy
 from dataclasses import dataclass
 
 from .cache import TTLCache
+from .config import Config
+from ..service import Context
 
 
 @dataclass
@@ -205,3 +207,13 @@ class Template:
 
         Cache.ComputeCache.set((self, variables, default), string)
         return string
+
+
+    @staticmethod
+    def get_default_metatext_variables(context: Context) -> dict:
+        return {
+            "config": Config.instance,
+            "context": {
+                "platform": context.platform.name
+            }
+        }

@@ -63,9 +63,8 @@ def setup():
 
         if topic is None:
             pages = [
-                Template.from_string(DataReader.instance["help.md"]).compute({
-                    "config": Config.instance
-                }, "")
+                Template.from_string(DataReader.instance["help.md"])
+                .compute(Template.get_default_metatext_variables(context), "")
             ]
             for group_id, group in get_command_groups().items():
                 page = f"**{group.brief}** (`{group.canonical_name}`): {group.description}\n"
@@ -111,6 +110,14 @@ def setup():
 
             await context.reply("", [Embed(f"Help: {group.brief}", description)])
             return
+
+
+    @hook_command("explain")
+    async def _(context: Context):
+        await context.reply(
+            Template.from_string(DataReader.instance["explain.md"])
+            .compute(Template.get_default_metatext_variables(context), "")
+        )
 
 
     @hook_command("stats")
