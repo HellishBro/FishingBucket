@@ -136,7 +136,7 @@ async def paged(context: Context, title: str, pages: list[str], start_page: int,
         reply_ctx = await context.reply("", [embed] + (additional_embeds or []))
         message = reply_ctx.message
 
-        async def callback(event: ReactionActionEvent):
+        async def callback(event: ReactionActionEvent) -> bool:
             nonlocal page
 
             if event.emoji in (LEFT, RIGHT):
@@ -162,9 +162,11 @@ async def paged(context: Context, title: str, pages: list[str], start_page: int,
                 elif page == 0:
                     await message.remove_reaction(LEFT)
 
+            return False
+
         Interactions.instance.add_interaction(
             reply_ctx,
-            Interaction(author, callback, pop_after_use=False)
+            Interaction(author, callback)
         )
 
         if len(pages) != 1:
