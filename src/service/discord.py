@@ -114,6 +114,9 @@ class Channel(c.Channel):
         webhook = await self.raw.create_webhook(name=name)
         return Webhook(webhook, self.bot)
 
+    async def permissions_for(self, member: Member) -> Permissions:
+        return Permissions((self.raw.permissions_for(member.raw)).value, self.bot)
+
 
 class Guild(c.Guild):
     raw: discord.Guild
@@ -182,8 +185,8 @@ class Role(c.Role):
         return self.raw.name
 
     @property
-    def permissions(self) -> int:
-        return self.raw.permissions.value
+    def permissions(self) -> Permissions:
+        return Permissions(self.raw.permissions.value, self.bot)
 
     @property
     def is_everyone(self) -> bool:
@@ -415,6 +418,15 @@ class ReactionActionEvent(c.ReactionActionEvent):
     @property
     def action(self) -> Literal["ADD"] | Literal["REMOVE"]:
         return "ADD" if self.raw.event_type == "REACTION_ADD" else "REMOVE"
+
+
+class Permissions(c.Permissions):
+    raw: int
+    bot: discord.Bot
+
+    @property
+    def manage_messages(self) -> bool:
+        return self.raw & 0x8 == 0x8 or self.raw & 0x2000 == 0x2000
 
 
 class Context(c.Context):

@@ -70,6 +70,58 @@ class User(c.User):
             return None
 
 
+async def _compute_base_permissions(member_id: int, roles: list[Role], guild: fluxer.Guild) -> int:
+    ALL = 0xFFFF_FFFF_FFFF_FFFF
+    if guild.owner_id == member_id:
+        return ALL
+
+
+    all_roles: list[fluxer.models.Role] = await guild.fetch_roles()
+
+    permissions = [r for r in all_roles if r.id == guild.id][0].permissions
+
+    for role in roles:
+        permissions |= role.permissions.raw
+
+    if permissions & 0x8 == 0x8:
+        return ALL
+
+    return permissions
+
+async def _compute_overwrites(base_permissions: int, bot: fluxer.Bot, member: fluxer.models.GuildMember, channel: fluxer.Channel):
+    ALL = 0xFFFF_FFFF_FFFF_FFFF
+    # ADMINISTRATOR overrides any potential permission overwrites, so there is nothing to do here.
+    if base_permissions & 0x8 == 0x8:
+        return ALL
+
+    permissions = base_permissions
+    overwrites: list[dict] = (await bot._http.request(fhttp.Route("GET", "/channels/{cid}", cid=str(channel.id))))["permission_overwrites"] or []
+    overwrite_everyone = [r for r in overwrites if int(r["id"]) == channel.guild_id]  # Find (@everyone) role overwrite and apply it.
+    if overwrite_everyone:
+        permissions &= ~int(overwrite_everyone[0]["deny"])
+        permissions |= int(overwrite_everyone[0]["allow"])
+
+    # Apply role specific overwrites.
+    allow = 0x0
+    deny = 0x0
+    for role_id in member.roles:
+        overwrite_role = [r for r in overwrites if int(r["id"]) == role_id]
+        if overwrite_role:
+            allow |= int(overwrite_role[0]["allow"])
+            deny |= int(overwrite_role[0]["deny"])
+
+    permissions &= ~deny
+    permissions |= allow
+
+    # Apply member specific overwrite if it exists.
+    overwrite_member = [r for r in overwrites if int(r["id"]) == member.user.id]
+    if overwrite_member:
+        permissions &= ~int(overwrite_member[0]["deny"])
+        permissions |= int(overwrite_member[0]["allow"])
+
+    return permissions
+
+
 class Channel(c.Channel):
     raw: fluxer.Channel
     bot: fluxer.Bot
@@ -114,6 +166,10 @@ class Channel(c.Channel):
 
     async def create_webhook(self, name: str) -> Webhook:
         return Webhook(await self.bot.create_webhook(str(self.id), name=name), self.bot)
+
+    async def permissions_for(self, member: Member) -> Permissions:
+        base_permissions = await _compute_base_permissions(member.user.id, await member.roles(), await self.bot.fetch_guild(str(self.raw.guild_id)))
+        return Permissions(await _compute_overwrites(base_permissions, self.bot, member.raw, self.raw), self.bot)
 
 
 class Guild(c.Guild):
@@ -186,8 +242,8 @@ class Role(c.Role):
         return self.raw.name
 
     @property
-    def permissions(self) -> int:
-        return self.raw.permissions
+    def permissions(self) -> Permissions:
+        return Permissions(self.raw.permissions, self.bot)
 
     @property
     def is_everyone(self) -> bool:
@@ -473,6 +529,15 @@ class ReactionActionEvent(c.ReactionActionEvent):
     @property
     def action(self) -> Literal["ADD"] | Literal["REMOVE"]:
         return "ADD" if self.raw.event_type == "REACTION_ADD" else "REMOVE"
+
+
+class Permissions(c.Permissions):
+    raw: int
+    bot: fluxer.Bot
+
+    @property
+    def manage_messages(self) -> bool:
+        return self.raw & 0x8 == 0x8 or self.raw & 0x2000 == 0x2000
 
 
 class Context(c.Context):

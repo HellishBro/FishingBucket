@@ -221,3 +221,30 @@ def setup():
             []
         )
     )
+
+    proxy_commands.append(
+        make_command(
+            {
+                "delete": [
+                    "del"
+                ]
+            },
+            "Deletes a proxied message.",
+            """
+            Deletes a proxied message.
+            This requires the command to be a reply to a message sent by a proxy.
+            Alternatively, react to a proxied message with :x: to do the same thing!
+            
+            If you have the Manage Messages permission, setting the `bypass` argument to true will bypass the proxy ownership check.
+            """,
+            [
+                Argument(
+                    "bypass",
+                    Optional(
+                        bool,
+                        False
+                    )
+                )
+            ]
+        )
+    )

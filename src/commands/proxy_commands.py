@@ -203,5 +203,27 @@ def setup():
                 await context.message.delete()
                 return
 
-        await context.reply("That message is not a proxied message!")
+        await context.reply("Error: that message is not a proxied message!")
+
+
+    @hook_command("delete")
+    async def _(context: Context, bypass: bool):
+        if not (ref := await context.message.get_reference()):
+            await context.reply("Error: reply to a proxied message to use this command.")
+            return
+
+        lnk = await Database.instance.get_message_link(ref.id, ref.channel_id)
+        if lnk:
+            bypasses = bypass and (await context.channel.permissions_for(await context.get_member(context.author.id))).manage_messages
+
+            if (proxy := await Database.instance.get_proxy(lnk.proxy_id)) and (bypasses or proxy.owner == await get_uid(context)):
+                await Database.instance.delete_link_message(ref.id, ref.channel_id)
+                await ref.delete()
+                await context.message.delete()
+                return
+
+            await context.reply("Error: you do not own this proxy!")
+            return
+
+        await context.reply("Error: that message is not a proxied message!")
 

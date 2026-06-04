@@ -107,6 +107,9 @@ class Channel(ABC):
     @abstractmethod
     async def create_webhook(self, name: str) -> Webhook: pass
 
+    @abstractmethod
+    async def permissions_for(self, member: Member) -> Permissions: pass
+
 
 class Guild(ABC):
     def __init__(self, raw, bot):
@@ -170,7 +173,7 @@ class Role(ABC):
 
     @property
     @abstractmethod
-    def permissions(self) -> int: pass
+    def permissions(self) -> Permissions: pass
 
     @property
     @abstractmethod
@@ -322,6 +325,16 @@ class ReactionActionEvent(ABC):
     @property
     @abstractmethod
     def action(self) -> Literal["ADD"] | Literal["REMOVE"]: pass
+
+
+class Permissions(ABC):
+    def __init__(self, raw, bot):
+        self.raw = raw
+        self.bot = bot
+
+    @property
+    @abstractmethod
+    def manage_messages(self) -> bool: pass
 
 
 class Context(ABC):
