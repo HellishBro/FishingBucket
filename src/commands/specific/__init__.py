@@ -173,7 +173,7 @@ class UnknownPageNumber(IntegerStrategy):
         return num - 1
 
     def example(self) -> str:
-        return str(random.randint(0, 10))
+        return str(random.randint(1, 10))
 
     def get_placeholder_text(self) -> str:
         return "page"
