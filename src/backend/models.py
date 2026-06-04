@@ -62,10 +62,6 @@ class ProxyGroup:
             None
         )
 
-valid_url = re.compile(r"https?://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)")
-def is_valid_url(string: str) -> bool:
-    return bool(valid_url.fullmatch(string))
-
 def sanitize(potential_template: str) -> str:
     return potential_template.replace("{", "\\{").replace("}", "\\}")
 

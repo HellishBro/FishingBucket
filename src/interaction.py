@@ -7,11 +7,10 @@ if TYPE_CHECKING:
 
 
 class Interaction:
-    def __init__(self, author: int, callback, expire_after = 5 * 60, pop_after_use = True):
+    def __init__(self, author: int, callback, expire_after = 5 * 60):
         self.author = author
         self.callback = callback
         self.expire_time = time.monotonic() + expire_after
-        self.pop_after_use = pop_after_use
 
     def __repr__(self):
         return f"Interaction({self.author}, expire_time={self.expire_time})"
@@ -51,7 +50,7 @@ class Interactions:
 
     async def wait_claim_after(self, timeout: int, message_id: int, platform: Platform) -> bool:
         await sleep(timeout)
-        if message_id in self.react_interactions:
+        if (message_id, platform) in self.react_interactions:
             self.react_interactions.pop((message_id, platform))
             return True
         return False
@@ -63,10 +62,9 @@ class Interactions:
         if interactions := self.react_interactions.get((context.id, context.platform), None):
             for interaction in interactions:
                 if interaction.author == author:
-                    await interaction.callback(*args)
-                    if interaction.pop_after_use:
+                    if await interaction.callback(*args):
                         del interactions
-                        if (context.id, context.platform) in self.react_interactions and not self.react_interactions[context.id, context.platform]:
+                        if (context.id, context.platform) in self.react_interactions and self.react_interactions[context.id, context.platform]:
                             self.react_interactions.pop((context.id, context.platform))
                     ret = True
         return ret

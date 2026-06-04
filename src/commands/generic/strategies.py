@@ -1,11 +1,12 @@
 import random
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal as Lit
 
 import humanfriendly
 
-from .data import Strategy, CharacterStream, ParseError, SyntaxParseError, ParsingArgument, Strategible
+from .data import Strategy, CharacterStream, ParseError, SyntaxParseError, ParsingArgument, Strategible, Argument
 from .misc import lorem_ipsum, escape_string
+from ...backend.utils import is_valid_url
 from ...service import Context, Role, Channel, User
 
 
@@ -110,6 +111,9 @@ class FloatStrategy(Strategy):
 
 
 class StringStrategy(Strategy):
+    def __init__(self, length: Lit["MINI"] | Lit["SHORT"] | Lit["MEDIUM"] | Lit["LONG"] = "SHORT"):
+        self.length = length
+
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> str:
         quote: None | str = None
         if stream.peek() in "'\"":
@@ -137,7 +141,7 @@ class StringStrategy(Strategy):
                 s += stream.consume()
 
     def example(self) -> str:
-        return escape_string(lorem_ipsum("SHORT")())
+        return escape_string(lorem_ipsum(self.length)())
 
     def get_placeholder_text(self) -> str:
         return "string"
@@ -243,6 +247,20 @@ class Literal(Strategy):
         return self.placeholder_text
 
 
+class URLStrategy(Strategy):
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> str:
+        s = await StringStrategy().parse(stream, argument, context)
+        if is_valid_url(s):
+            return s
+        raise SyntaxParseError(f"{s!r} is not a valid URL.")
+
+    def example(self) -> str:
+        return "https://example.com"
+
+    def get_placeholder_text(self) -> str:
+        return "url"
+
+
 class OneOf(Strategy):
     def __init__(self, *strats: Strategible):
         self.strats = [strategize(strat) for strat in strats]
@@ -342,6 +360,52 @@ class List(Strategy):
 
     def get_placeholder_text(self) -> str:
         return self.datatype.get_placeholder_text() + "(s)"
+
+
+class Sequence(Strategy):
+    def __init__(self, *arguments: Argument):
+        self.arguments = arguments
+
+    async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> list[Any]:
+        results = []
+        for idx, arg in enumerate(self.arguments):
+            strat = strategize(arg.strategy)
+
+            if not strat.accept_end_of_stream and stream.end:
+                raise ParseError(f"unexpected end of arguments while trying to parse sub-argument #{idx + 1} `{arg.name}`")
+
+            try:
+                results.append(await strat.parse(stream, ParsingArgument(arg, argument.position, argument.position_end), context))
+            except ParseError as e:
+                raise ParseError(f"error parsing sub-argument #{idx + 1} `{arg.name}`: {e.message}")
+
+            if not strat.expect_start_another:
+                try:
+                    stream.expect_argument_end()
+                except ParseError as e:
+                    raise ParseError(f"error transitioning to sub-argument #{idx + 1}: {e.message}")
+
+        return results
+
+
+    def example(self) -> str:
+        parts = []
+
+        for argument in self.arguments:
+            parts.append(argument.get_example())
+
+        return " ".join(parts).replace("  ", " ").strip()
+
+    def get_placeholder_text(self) -> str:
+        parts = []
+
+        for argument in self.arguments:
+            strat = strategize(argument.strategy)
+            placeholder = strat.get_placeholder_text().replace("  ", " ")
+            part = f"{strat.bracket_start}{argument.name}: {placeholder}{strat.bracket_end}"
+            parts.append(part)
+
+        return "< " + " ".join(parts).strip() + " >"
 
 
 class _UseSnowflakeStrategy(Strategy):

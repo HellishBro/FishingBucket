@@ -446,12 +446,13 @@ class Context(c.Context):
         super().__init__(Platform.Discord, bot, message)
         self.bot = bot
 
-    async def interact_to_delete(self, event: ReactionActionEvent):
+    async def interact_to_delete(self, event: ReactionActionEvent) -> bool:
         if event.emoji == "❌":
             context = await event.context()
             await context.message.delete()
             Interactions.instance.delete_interaction(context)
-        return None
+            return True
+        return False
 
     async def reply(self, content: str, embeds: list[Embed] = None, files: list[File] = None, **kwargs) -> Context:
         try:
