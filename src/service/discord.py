@@ -89,6 +89,10 @@ class Channel(c.Channel):
         return Guild(self.raw.guild, self.bot)
 
     @property
+    def guild_id(self) -> int:
+        return self.raw.guild.id
+
+    @property
     def mention(self) -> str:
         return f"<#{self.id}>"
 
@@ -234,6 +238,10 @@ class Message(c.Message):
         return self.raw.channel.id
 
     @property
+    def guild_id(self) -> int:
+        return self.raw.guild.id
+
+    @property
     def guild(self) -> Guild:
         return Guild(self.raw.guild, self.bot)
 
@@ -241,8 +249,7 @@ class Message(c.Message):
     def context(self) -> Context:
         return Context(self, self.bot)
 
-    @property
-    def mention(self) -> str:
+    async def mention(self) -> str:
         return f"https://discord.com/channels/{self.guild.id if not self.channel.dm else '@me'}/{self.channel.id}/{self.id}"
 
     @property
@@ -318,14 +325,14 @@ class Webhook(c.Webhook):
         )
         return Message(message, self.bot).context
 
-    def transform_embeds(self, embeds: list[Embed], reference: Context) -> list[Embed]:
+    async def transform_embeds(self, embeds: list[Embed], reference: Context) -> list[Embed]:
         trunc = reference.content[:min(250, len(reference.content))]
         if len(trunc) != len(reference.content):
             trunc += "..."
 
         return [Embed(
             "Reply",
-            f"[Replying to]({reference.message.mention}) {reference.message.author.display_name}:\n{'\n'.join(('> ' + line) for line in trunc.split('\n'))}"
+            f"[Replying to]({await reference.message.mention()}) {reference.message.author.display_name}:\n{'\n'.join(('> ' + line) for line in trunc.split('\n'))}"
         )] + embeds
 
     REPLY_DESCRIPTION_REGEX = re.compile(r"\[Replying to]\(https://discord\.com/channels/(?:\d+?|@me)/\d+?/(\d+?)\) .+?:")
@@ -335,17 +342,19 @@ class Webhook(c.Webhook):
         mention_str = mention_str or context.author.mention
         return await self.send(
             f"-# ↩ {mention_str}\n{content}" if mention_str is not False else content,
-            username, avatar_url, mention, self.transform_embeds(embeds, context), files
+            username, avatar_url, mention, await self.transform_embeds(embeds, context), files
         )
 
     async def edit(self, context: Context, content: str, embeds: list[Embed] = None, **kwargs):
         data = (await self.get_message_data(context)).context
         if data.message.has_reference:
-           content = context.content.split("\n")[0] + content
+            content = context.content.split("\n")[0] + "\n" + content
         await self.raw.edit_message(
             context.id,
             content=content,
-            embeds=[embed for embed in context.message.embeds if embed.title == "Reply"] + (embeds or []),
+            embeds=[
+                       to_embed(embed) for embed in context.message.embeds if embed.title == "Reply"
+                   ] + ([to_embed(e) for e in embeds] or []),
             **kwargs
         )
 
@@ -357,7 +366,7 @@ class Webhook(c.Webhook):
         if referenced_message_embeds:
             referenced_message_embed = referenced_message_embeds[0]
             match = Webhook.REPLY_DESCRIPTION_REGEX.match(referenced_message_embed.description.split("\n")[0])
-            _, message_id = match.groups()
+            message_id = match.group(1)
             message_id = int(message_id)
             referenced_message = await context.channel.get_message(message_id)
             actual_contents = context.content.split("\n", maxsplit=1)[1]
@@ -371,9 +380,12 @@ class Webhook(c.Webhook):
             def embeds(self) -> list[Embed]:
                 return actual_embeds
 
-            @property
-            def reference(self) -> Message | None:
+            async def get_reference(self) -> Message | None:
                 return referenced_message
+
+            @property
+            def has_reference(self) -> bool:
+                return referenced_message is not None
 
         return M(context.message.raw, self.bot)
 

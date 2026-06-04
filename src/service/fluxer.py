@@ -15,7 +15,7 @@ from ..interaction import Interactions, Interaction
 
 
 def from_embed(embed: Embed) -> fluxer.Embed:
-    return fluxer.Embed(embed.title, embed.description, footer=embed.footer, thumbnail=embed.thumbnail_url)
+    return fluxer.Embed(embed.title, embed.description, footer={"text": embed.footer}, thumbnail={"url": embed.thumbnail_url})
 
 
 def from_file(file: File) -> fluxer.File:
@@ -141,6 +141,10 @@ class Channel(c.Channel):
     @property
     def guild(self) -> Guild:
         return Guild(self.raw.guild, self.bot)
+
+    @property
+    def guild_id(self) -> int:
+        return self.raw.guild_id
 
     @property
     def mention(self) -> str:
@@ -291,6 +295,10 @@ class Message(c.Message):
         return self.raw.channel_id
 
     @property
+    def guild_id(self) -> int:
+        return self.raw.guild_id
+
+    @property
     def guild(self) -> Guild:
         return Guild(self.raw.guild, self.bot)
 
@@ -298,9 +306,10 @@ class Message(c.Message):
     def context(self) -> Context:
         return Context(self, self.bot)
 
-    @property
-    def mention(self) -> str:
-        return f"https://web.fluxer.app/channels/{self.guild.id if not self.channel.dm else '@me'}/{self.channel.id}/{self.id}"
+    async def mention(self) -> str:
+        channel = Channel(await self.bot.fetch_channel(str(self.channel_id)), self.bot)
+
+        return f"https://web.fluxer.app/channels/{channel.guild_id if not channel.dm else '@me'}/{channel.id}/{self.id}"
 
     @property
     def has_reference(self) -> bool: return self.raw.referenced_message is not None

@@ -248,3 +248,21 @@ def setup():
             ]
         )
     )
+
+    proxy_commands.append(
+        make_command(
+            "edit",
+            "Edits a proxied message.",
+            """
+            Edits a proxied message.
+            This requires the command to be a reply to a message sent by a proxy.
+            You must own the proxy to edit the message.
+            """,
+            [
+                Argument(
+                    "message",
+                    str
+                )
+            ]
+        )
+    )

@@ -11,7 +11,7 @@ from ..backend import database as db
 from ..backend.models import Proxy
 from ..backend.template_utils import Template
 from ..backend.utils import normalize_emojis
-from ..send_proxy import reproxy
+from ..send_proxy import reproxy, get_webhook, edit_proxy_message
 from ..service import Context, Embed, Webhook
 
 
@@ -196,7 +196,7 @@ def setup():
             if proxy := await Database.instance.get_proxy(lnk.proxy_id):
                 e = Embed(
                     "Proxied Message",
-                    f"**Proxy**: {proxy.name}\n**Owner**: <@{lnk.platform_user}> (`{lnk.platform_user}`)\n**Message Link**: [link]({ref.mention})\n**Message**:\n{'\n'.join(('> ' + ln) for ln in ref.content.split('\n'))}"
+                    f"**Proxy**: {proxy.name}\n**Owner**: <@{lnk.platform_user}> (`{lnk.platform_user}`)\n**Message Link**: [link]({await ref.mention()})\n**Message**:\n{'\n'.join(('> ' + ln) for ln in ref.content.split('\n'))}"
                 )
                 dm = await context.author.get_dm()
                 await dm.send("", [e])
@@ -220,6 +220,25 @@ def setup():
                 await Database.instance.delete_link_message(ref.id, ref.channel_id)
                 await ref.delete()
                 await context.message.delete()
+                return
+
+            await context.reply("Error: you do not own this proxy!")
+            return
+
+        await context.reply("Error: that message is not a proxied message!")
+
+
+    @hook_command("edit")
+    async def _(context: Context, message: str):
+        if not (ref := await context.message.get_reference()):
+            await context.reply("Error: reply to a proxied message to use this command.")
+            return
+
+        lnk = await Database.instance.get_message_link(ref.id, ref.channel_id)
+        if lnk:
+            if (proxy := await Database.instance.get_proxy(lnk.proxy_id)) and proxy.owner == (owner := await get_uid(context)):
+                await context.message.delete()
+                await edit_proxy_message(ref.context, message, lnk, owner)
                 return
 
             await context.reply("Error: you do not own this proxy!")

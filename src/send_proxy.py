@@ -62,12 +62,12 @@ async def get_proxied_messages(message: str, user_id: int, autoproxy_preferences
 async def get_webhook(context: Context) -> Webhook:
     webhook = None
 
-    if webhook_id := await Database.instance.get_channel_webhook(context.channel.id, context.platform):
+    if webhook_id := await Database.instance.get_channel_webhook(context.message.channel_id, context.platform):
         webhook = await context.get_bot.get_webhook(webhook_id)
 
     if webhook is None:
         webhook = await context.channel.create_webhook(Config.instance.webhook)
-        await Database.instance.put_channel_webhook_link(context.channel.id, webhook.id, context.platform)
+        await Database.instance.put_channel_webhook_link(context.message.channel_id, webhook.id, context.platform)
 
     return webhook
 
@@ -144,7 +144,7 @@ async def reproxy(context: Context, old_proxy: Proxy, new_proxy: Proxy):
     embeds = fixed_message.embeds
     parent_message = await fixed_message.get_reference()
     previous_link: MessageLink = await Database.instance.get_message_link(context.message.id, context.message.channel_id)
-    guild = Guild(context.channel.guild.id, context.platform)
+    guild = Guild((await context.get_channel(context.message.channel_id)).guild_id, context.platform)
     server_preferences = await Database.instance.get_guild_preferences(guild)
     await context.message.delete()
     await Database.instance.delete_link_message(context.message.id, context.channel.id)
@@ -166,39 +166,36 @@ async def reproxy(context: Context, old_proxy: Proxy, new_proxy: Proxy):
         logging_channel = await context.get_channel(logging_channel_id)
         embed = Embed(
             f"Message Proxy Change",
-            f"**Previous Proxy**: {old_proxy.effective_name}\n**New Proxy**: {new_proxy.effective_name}\n**Owner**: {context.author.mention} (`{context.author.id}`)\n**Channel**: {context.channel.mention} (`{context.channel.id}`)\n**New Message Link**: [jump]({m.message.mention})",
+            f"**Previous Proxy**: {old_proxy.effective_name}\n**New Proxy**: {new_proxy.effective_name}\n**Owner**: <@{previous_link.platform_user}> (`{previous_link.platform_user}`)\n**Channel**: {context.channel.mention} (`{context.channel.id}`)\n**New Message Link**: [jump]({await m.message.mention()})",
             thumbnail_url=new_proxy.effective_avatar
         )
         await logging_channel.send("", embeds=[embed])
 
 
-async def edit_proxy_message(old_message: fluxer.Message, bot: fluxer.Bot, new_message_contents: str):
-    embeds = old_message.embeds
-    webhook = await get_webhook(old_message.channel_id, bot)
-    lnk = await Database.instance.get_message_link(old_message.id, old_message.channel_id)
-    proxy = await Database.instance.get_proxy(lnk.proxy_id)
-    server_preferences = await Database.instance.get_guild_preferences(Guild((await bot.fetch_channel(str(old_message.channel_id))).guild_id, Platform.Fluxer))
-    pre, old_msg = recover_original_message(old_message)
-    contents, embeds = await modify_message(proxy.owner, server_preferences, new_message_contents, embeds)
-    old_msg = old_message.content
-    if pre:
-        contents = pre + "\n" + contents
-    m = await edit_webhook(webhook, bot, old_message, contents, embeds)
+async def edit_proxy_message(old_message: Context, new_message_contents: str, message_link: MessageLink, owner: int):
+    webhook: Webhook = await get_webhook(old_message)
+    guild = Guild((await old_message.get_channel(old_message.message.channel_id)).guild_id, old_message.platform)
+
+    server_preferences = await Database.instance.get_guild_preferences(guild)
+    contents, embeds = await modify_message(owner, server_preferences, new_message_contents, [])
+
+    await webhook.edit(
+        old_message,
+        contents,
+        embeds
+    )
+
     logging_channel_id = server_preferences.logging_channel
     if logging_channel_id != 0:
-        logging_channel = await bot.fetch_channel(str(logging_channel_id))
-        message_link = await mention_message(bot, m)
-        embed = fluxer.Embed(
+        logging_channel = await old_message.get_channel(logging_channel_id)
+        proxy = await Database.instance.get_proxy(message_link.proxy_id)
+
+        embed = Embed(
             f"Message Edit",
-            f"**Proxy**: {proxy.effective_name}\n**Owner**: <@{lnk.platform_user}> (`{lnk.platform_user}`)\n**Channel**: <#{m.channel_id}> (`{m.channel_id}`)\n**Message Link**: [jump]({message_link})\n**Old Message**:\n{'\n'.join('> ' + line for line in old_msg.split('\n'))}\n**New Message**:\n{'\n'.join('> ' + line for line in new_message_contents.split('\n'))}"
+            f"**Proxy**: {proxy.effective_name}\n**Owner**: <@{message_link.platform_user}> (`{message_link.platform_user}`)\n**Channel**: <#{old_message.message.channel_id}> (`{old_message.message.channel_id}`)\n**Message Link**: [jump]({await old_message.message.mention()})\n**Old Message**:\n{'\n'.join('> ' + line for line in old_message.content.split('\n'))}\n**New Message**:\n{'\n'.join('> ' + line for line in new_message_contents.split('\n'))}",
+            thumbnail_url=proxy.effective_avatar
         )
-        embed.set_thumbnail(url=proxy.effective_avatar)
         await logging_channel.send("", embeds=[embed])
-
-
-@TTLCache(1024, 3600).cache_async(["user", "guild"])
-async def get_member(bot: fluxer.Bot, guild: int, user: int) -> fluxer.GuildMember:
-    return await (await bot.fetch_guild(str(guild))).fetch_member(user)
 
 
 async def on_user_message(context: Context):
@@ -244,9 +241,9 @@ async def on_user_message(context: Context):
 
                     if logging_channel:
                         if ctx:
-                            message_link = ctx.message.mention
+                            message_link = await ctx.message.mention()
                             ref = await context.message.get_reference()
-                            reply_msg = f"**Replying To**: [message link]({ref.mention})\n" if ref and i == 0 else ""
+                            reply_msg = f"**Replying To**: [message link]({await ref.mention()})\n" if ref and i == 0 else ""
                             embed = Embed(
                                 f"Proxied Message",
                                 f"**Proxy**: {proxy.effective_name}\n**Owner**: {context.author.mention} (`{context.author.id}`)\n**Channel**: {context.channel.mention} (`{context.channel.id}`)\n**Message Link**: [jump]({message_link})\n{reply_msg}**Message**:\n{'\n'.join('> ' + line for line in m.split('\n'))}",

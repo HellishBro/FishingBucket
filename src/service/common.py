@@ -93,6 +93,10 @@ class Channel(ABC):
 
     @property
     @abstractmethod
+    def guild_id(self) -> int: pass
+
+    @property
+    @abstractmethod
     def mention(self) -> str: pass
 
     @abstractmethod
@@ -223,15 +227,18 @@ class Message(ABC):
 
     @property
     @abstractmethod
+    def guild_id(self) -> int: pass
+
+    @property
+    @abstractmethod
     def guild(self) -> Guild: pass
 
     @property
     @abstractmethod
     def context(self) -> Context: pass
 
-    @property
     @abstractmethod
-    def mention(self) -> str: pass
+    async def mention(self) -> str: pass
 
     @property
     @abstractmethod
