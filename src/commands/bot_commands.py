@@ -9,7 +9,7 @@ from ..backend.config import Config
 from ..backend.data_reader import DataReader
 from ..backend.database import Database
 from ..backend.template_utils import Template
-from ..service import Platform, Context, Embed
+from ..service import Platform, Context, Embed, Channel
 
 
 def setup():
@@ -156,3 +156,21 @@ def setup():
                 f"{Config.instance.name} Statistics",
                 "\n".join(f"**{(m := mapping.get(stat, (stat, lambda n: str(n))))[0]}** (`{stat}`): {m[1](all_stats[stat])}" for stat in all_stats)
             )])
+
+
+    if Config.instance.website:
+        @hook_command("dashboard")
+        async def _(context: Context):
+            await context.reply(f"The link to the dashboard can be accessed [here]({Config.instance.website.dashboard}).")
+
+        @hook_command("website")
+        async def _(context: Context):
+            await context.reply(f"Come visit the website for {Config.instance.name} [here]({Config.instance.website.home}).")
+
+        @hook_command("legal")
+        async def _(context: Context):
+            await context.reply(f"Please view our Terms of Service [here]({Config.instance.website.terms}), and our Privacy Policy [here]({Config.instance.website.privacy}).")
+
+        @hook_command("contact")
+        async def _(context: Context):
+            await context.reply(f"Contact us [here]({Config.instance.website.contact})!")

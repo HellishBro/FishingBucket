@@ -1,6 +1,7 @@
 from ..generic import make_command, Argument, make_command_group, get_commands, get_command_groups, CommandGroup
 from ..generic.strategies import OneOf, OptionList, Optional
-
+from ...backend.config import Config
+from ...service import Channel
 
 bot_group: CommandGroup
 
@@ -76,6 +77,68 @@ def setup():
             ]
         )
     )
+
+
+    if Config.instance.website:
+        bot_group.append(
+            make_command(
+                {
+                    "dashboard": [
+                        "dash"
+                    ]
+                },
+                "Opens the link to the online dashboard.",
+                """
+                Opens the link to the online dashboard.
+                """,
+                []
+            )
+        )
+
+        bot_group.append(
+            make_command(
+                {
+                    "website": [
+                        "site"
+                    ]
+                },
+                "Opens the link to the online website homepage.",
+                """
+                Opens the link to the online website homepage.
+                """,
+                []
+            )
+        )
+
+        bot_group.append(
+            make_command(
+                {
+                    "legal": [
+                        "terms",
+                        "privacy",
+                        "tos"
+                    ]
+                },
+                "Links to the legal pages on the website.",
+                """
+                Links to the legal pages on the website.
+                Contains Terms of Service and Privacy Policy.
+                """,
+                []
+            )
+        )
+
+        bot_group.append(
+            make_command(
+                "contact",
+                "Opens the link to the Contact Us page on the website.",
+                """
+                Opens the link to the Contact Us page on the website.
+                """,
+                []
+            )
+        )
+
 
 
 def setup_help_command():
