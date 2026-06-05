@@ -2,6 +2,7 @@ import json
 
 from pydantic import BaseModel, AnyHttpUrl, PositiveInt, PositiveFloat
 
+from . import Exporter
 from .common import Importer
 from ..models import ProxyGroup, Proxy
 
@@ -80,3 +81,43 @@ class NativeImporter(Importer):
             for idx in to_remove:
                 groups_queue.pop(idx)
 
+class NativeExporter(Exporter):
+    def export_data(self) -> bytes:
+        serialized_groups: dict[str, NativeGroup] = {}
+        serialized_proxies: list[NativeProxy] = []
+
+        group_obj_idx_map: dict[int, str] = {}
+        for idx, group in enumerate(self.groups):
+            serialized_groups[f"${idx}"] = NativeGroup(
+                name=group.name,
+                description=group.description or "",
+                time=group.creation_date,
+                tag=group.tag or "",
+                parent=None
+            )
+            group_obj_idx_map[id(group)] = f"${idx}"
+
+        for idx, group in enumerate(self.groups):
+            if group.parent:
+                serialized_groups[f"${idx}"].parent = group_obj_idx_map[id(group.parent)]
+
+        for proxy in self.proxies:
+            serialized_proxies.append(NativeProxy(
+                name=proxy.name,
+                description=proxy.description or "",
+                avatar_url=AnyHttpUrl(proxy.avatar_url),
+                triggers=proxy.triggers,
+                times_used=proxy.times_used or 0,
+                time=proxy.creation_date,
+                group=group_obj_idx_map.get(id(proxy.group), None),
+                nickname=proxy.nickname or "",
+                forms=proxy.forms or {},
+                current_form=proxy.current_form or None
+            ))
+
+        data = NativeRoot(proxies=serialized_proxies, groups=serialized_groups)
+        return data.model_dump_json().encode("utf-8")
+
+    @property
+    def filename(self) -> str:
+        return "proxies.json"

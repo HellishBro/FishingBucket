@@ -6,9 +6,8 @@ from aiohttp import ClientSession
 from .generic import hook_command
 from .specific import get_uid
 from ..backend.database import Database
-from ..backend.import_system import NativeImporter, TupperboxImporter, PluralKitImporter, UtterImporter
+from ..backend.import_system import NativeImporter, TupperboxImporter, PluralKitImporter, UtterImporter, NativeExporter
 from ..backend.models import ProxyGroup, Proxy
-from ..import_helper import import_native, import_tupperbox, import_pluralkit, import_utter, export_native
 from ..service import Context, Embed, File
 
 
@@ -145,11 +144,11 @@ def setup():
         owner = await get_uid(context)
         groups = await Database.instance.get_user_groups(owner)
         proxies = await Database.instance.get_user_proxies(owner)
-        jsoned = json.dumps(export_native(groups, proxies), indent=4)
+        exporter = NativeExporter(proxies, groups)
         file = File(
-            "proxies.json",
+            exporter.filename,
             "",
-            jsoned.encode("utf-8")
+            exporter.export_data()
         )
         if not (await context.get_channel(context.message.channel_id)).dm:
             dm = await context.author.get_dm()
