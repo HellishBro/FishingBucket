@@ -235,7 +235,7 @@ class Literal(Strategy):
         self.strat = strategize(strat or type(self.literal))
 
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any:
-        parse = self.strat.parse(stream, argument, context)
+        parse = await self.strat.parse(stream, argument, context)
         if parse != self.literal:
             raise SyntaxParseError(f"expected literal {self.literal!r}")
         return parse
@@ -340,8 +340,9 @@ class Optional(Strategy):
 class List(Strategy):
     accept_end_of_stream = True
 
-    def __init__(self, datatype: Strategible):
+    def __init__(self, datatype: Strategible, minimum: int = 0):
         self.datatype = strategize(datatype)
+        self.minimum = minimum
 
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> list[Any]:
         l = []
@@ -353,37 +354,46 @@ class List(Strategy):
                 stream.pos = start
                 break
             stream.expect_argument_end()
+        if len(l) < self.minimum:
+            raise ParseError(f"expected at least {self.minimum} elements, got {len(l)}")
+
         return l
 
     def example(self) -> str:
-        return " ".join(self.datatype.example() for _ in range(random.randint(0, 3)))
+        return " ".join(self.datatype.example() for _ in range(random.randint(self.minimum, 3)))
 
     def get_placeholder_text(self) -> str:
-        return self.datatype.get_placeholder_text() + "(s)"
+        return self.datatype.get_placeholder_text() + ("(s)" if self.minimum == 0 else "s")
 
 
 class Sequence(Strategy):
-    def __init__(self, *arguments: Argument):
+    def __init__(self, *arguments: Argument, discriminated_fields: int = 0):
         self.arguments = arguments
+        self.discriminated_fields = discriminated_fields
 
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> list[Any]:
         results = []
         for idx, arg in enumerate(self.arguments):
             strat = strategize(arg.strategy)
 
-            if not strat.accept_end_of_stream and stream.end:
-                raise ParseError(f"unexpected end of arguments while trying to parse sub-argument #{idx + 1} `{arg.name}`")
-
             try:
-                results.append(await strat.parse(stream, ParsingArgument(arg, argument.position, argument.position_end), context))
-            except ParseError as e:
-                raise ParseError(f"error parsing sub-argument #{idx + 1} `{arg.name}`: {e.message}")
+                if not strat.accept_end_of_stream and stream.end:
+                    raise ParseError(f"unexpected end of arguments while trying to parse sub-argument #{idx + 1} `{arg.name}`")
 
-            if not strat.expect_start_another:
                 try:
-                    stream.expect_argument_end()
+                    results.append(await strat.parse(stream, ParsingArgument(arg, idx, len(self.arguments) - idx - 1), context))
                 except ParseError as e:
-                    raise ParseError(f"error transitioning to sub-argument #{idx + 1}: {e.message}")
+                    raise ParseError(f"error parsing sub-argument #{idx + 1} `{arg.name}`: {e.message}")
+
+                if not strat.expect_start_another:
+                    try:
+                        stream.expect_argument_end()
+                    except ParseError as e:
+                        raise ParseError(f"error transitioning to sub-argument #{idx + 1}: {e.message}")
+            except ParseError as e:
+                if idx < self.discriminated_fields:
+                    raise SyntaxParseError(e.message)
+                raise e
 
         return results
 
@@ -405,7 +415,7 @@ class Sequence(Strategy):
             part = f"{strat.bracket_start}{argument.name}: {placeholder}{strat.bracket_end}"
             parts.append(part)
 
-        return "< " + " ".join(parts).strip() + " >"
+        return "( " + " ".join(parts).strip() + " )"
 
 
 class _UseSnowflakeStrategy(Strategy):
