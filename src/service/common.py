@@ -389,3 +389,6 @@ class Context(ABC):
     @property
     @abstractmethod
     def get_bot(self) -> Bot: pass
+
+    @abstractmethod
+    async def get_wh_message_data(self, context: Context) -> Message: pass

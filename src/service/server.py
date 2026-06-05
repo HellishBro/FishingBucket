@@ -16,6 +16,7 @@ type Coro = Callable[..., Coroutine[Any, Any, Any]]
 class Server[Bot = fluxer.Bot | discord.Bot](ABC):
     bot: Bot
     platform: Platform
+    ready: bool = False
 
     @abstractmethod
     async def start(self): pass

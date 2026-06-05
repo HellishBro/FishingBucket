@@ -564,13 +564,13 @@ class Context(c.Context):
 
     async def reply(self, content: str, embeds: list[Embed] = None, files: list[File] = None, **kwargs) -> Context:
         try:
-            ctx = await self.message.reply(content, embeds, files, **kwargs)
+            ctx = await self.message.reply(content, embeds, files)
         except fluxer.NotFound:
             ctx = await self.channel.send(
                 (f"<@{self.author.id}>\n" if not self.is_bot else "") + content,
-                embeds, files, **kwargs)
+                embeds, files)
 
-        Interactions.instance.add_interaction(ctx, Interaction(self.author.id, self.interact_to_delete))
+        Interactions.instance.add_interaction(ctx, Interaction(kwargs.get("user_id_override", self.author.id), self.interact_to_delete))
         return ctx
 
     @property
@@ -615,3 +615,7 @@ class Context(c.Context):
     @property
     def get_bot(self) -> Bot:
         return Bot(self.bot, self.bot)
+
+    async def get_wh_message_data(self, context: Context) -> Message:
+        webhook = Webhook(None, self.bot)
+        return await webhook.get_message_data(context)
