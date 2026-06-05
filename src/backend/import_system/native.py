@@ -1,6 +1,6 @@
 import json
 
-from pydantic import BaseModel, AnyHttpUrl, PositiveInt, PositiveFloat
+from pydantic import BaseModel, AnyHttpUrl, PositiveFloat, NonNegativeInt
 
 from . import Exporter
 from .common import Importer
@@ -20,7 +20,7 @@ class NativeProxy(BaseModel):
     description: str
     avatar_url: AnyHttpUrl
     triggers: list[str]
-    times_used: PositiveInt
+    times_used: NonNegativeInt
     time: PositiveFloat
     group: str | None
     nickname: str
