@@ -1,6 +1,7 @@
 import time
 
 from .backend.models import Proxy, ProxyGroup
+from pydantic import BaseModel
 
 def import_tupperbox(json: dict, owner: int) -> tuple[list[ProxyGroup], list[Proxy]]:
     groups = json.get("groups", [])

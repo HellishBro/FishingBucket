@@ -1,10 +1,13 @@
 import json
 
+import pydantic
 from aiohttp import ClientSession
 
 from .generic import hook_command
 from .specific import get_uid
 from ..backend.database import Database
+from ..backend.import_system import NativeImporter, TupperboxImporter, PluralKitImporter, UtterImporter
+from ..backend.models import ProxyGroup, Proxy
 from ..import_helper import import_native, import_tupperbox, import_pluralkit, import_utter, export_native
 from ..service import Context, Embed, File
 
@@ -45,33 +48,28 @@ def setup():
         }
 
         confirmation = await context.reply(f"Importing from {origin_names[origin]}")
-
-        requires_json = ["fishing_bucket", "tupperbox", "pluralkit", "utter"]
-
-        res = None
-        if origin in requires_json:
-            try:
-                res = json.loads(contents.decode("utf-8"))
-            except json.JSONDecodeError as e:
-                await confirmation.message.edit(f"Error: cannot parse file at {e.lineno}:{e.colno}: {e.msg}")
-                await context.message.delete()
-                return
-
-        await context.message.delete()
+        try:
+            await context.message.delete()
+        except: pass
 
         owner = await get_uid(context, True)
 
-        groups, proxies = [], []
-
         if origin == "fishing_bucket":
-            groups, proxies = import_native(res, owner)
+            cls = NativeImporter()
         elif origin == "tupperbox":
-            groups, proxies = import_tupperbox(res, owner)
+            cls = TupperboxImporter()
         elif origin == "pluralkit":
-            groups, proxies = import_pluralkit(res, owner)
+            cls = PluralKitImporter()
         elif origin == "utter":
-            groups, proxies = import_utter(res, owner)
+            cls = UtterImporter()
+        else:
+            raise Exception("unreachable")
 
+        try:
+            cls.import_data(contents, owner)
+        except (json.JSONDecodeError, pydantic.ValidationError) as e:
+            await confirmation.reply(f"Error: cannot parse file")
+            return
 
         user_proxies = await Database.instance.get_user_proxies(owner)
         user_groups = await Database.instance.get_user_groups(owner)
@@ -79,10 +77,11 @@ def setup():
         updated_proxies = 0
         updated_groups = 0
 
-        inserted_proxy_instances = []
-        inserted_group_instances = []
+        inserted_proxy_instances: list[Proxy] = []
+        inserted_group_instances: list[ProxyGroup] = []
 
-        for group in groups:
+        groups_queue: list[ProxyGroup] = []
+        for group in cls.groups:
             founds = [g for g in user_groups if g.name == group.name]
             if founds:
                 in_database = founds[0]
@@ -90,9 +89,18 @@ def setup():
                 await Database.instance.update_group_description(in_database.id, group.description)
                 updated_groups += 1
             else:
-                inserted_group_instances.append(await Database.instance.put_group(group))
+                groups_queue.append(group)
 
-        for proxy in proxies:
+        while groups_queue:
+            to_remove: list[int] = []
+            for idx, group in enumerate(groups_queue):
+                if group.parent not in groups_queue:
+                    inserted_group_instances.append(await Database.instance.put_group(group))
+                    to_remove.append(idx)
+            for idx in sorted(to_remove, reverse=True):
+                groups_queue.pop(idx)
+
+        for proxy in cls.proxies:
             founds = [p for p in user_proxies if p.name == proxy.name]
             if founds:
                 in_database = founds[0]
@@ -104,8 +112,8 @@ def setup():
             else:
                 inserted_proxy_instances.append(await Database.instance.put_proxy(proxy))
 
-        inserted_proxies = len(proxies) - updated_proxies
-        inserted_groups = len(groups) - updated_groups
+        inserted_proxies = len(cls.proxies) - updated_proxies
+        inserted_groups = len(cls.groups) - updated_groups
 
         await confirmation.message.edit(
             f"Proxies loaded! Updated {updated_proxies} proxies and {updated_groups} groups, and inserted {inserted_proxies} new proxies and {inserted_groups} new groups!")
