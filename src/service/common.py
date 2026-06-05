@@ -351,7 +351,7 @@ class Context(ABC):
         self.message = message
 
     @abstractmethod
-    async def reply(self, content: str, embeds: list[Embed] = None, files: list[Attachment] = None, **kwargs) -> Context: pass
+    async def reply(self, content: str, embeds: list[Embed] = None, files: list[File] = None, **kwargs) -> Context: pass
 
     @property
     @abstractmethod
