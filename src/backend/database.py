@@ -245,6 +245,7 @@ class Database:
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_guild_id ON autoproxies (guild_id);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_user_id ON autoproxies (user_id);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_accounts_query ON accounts (user_id, account_type);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_group_parent ON proxy_groups (id, parent);")
         await self.connection.execute("PRAGMA journal_mode=WAL;")
         await self.connection.execute("PRAGMA synchronous=NORMAL;")
         await self.connection.execute("PRAGMA cache_size=-64000;") # 64MB cache
@@ -1219,6 +1220,21 @@ class Database:
                 ret = Proxy.from_database(res, await self.get_user_groups(res[lst_proxy_fields.index("owner")]))
                 Cache.proxy_cache.set(id_, ret)
             return ret
+
+    async def will_groups_cycle(self, group_id: int, potential_new_group_parent_id: int) -> bool:
+        # excuse this chatgpt code
+        async with self.connection.execute("""
+        WITH RECURSIVE ancestors AS (
+            SELECT id, parent FROM proxy_groups WHERE id = ?
+            UNION ALL
+            SELECT g.id, g.parent
+            FROM proxy_groups g
+            INNER JOIN ancestors a ON a.parent = g.id
+        )
+        SELECT EXISTS (SELECT 1 FROM ancestors WHERE id = ?);
+        """, (potential_new_group_parent_id, group_id)) as cursor:
+            do_loop, = await cursor.fetchone()
+            return do_loop
 
     async def get_group(self, id_: int) -> ProxyGroup | None:
         if ret := Cache.group_cache.get(id_): return ret

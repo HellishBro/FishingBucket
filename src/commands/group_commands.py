@@ -114,6 +114,11 @@ def setup():
                 await Database.instance.update_group(proxy.id, to.id)
         elif item_type == "groups":
             for group in items_list:
+                if await Database.instance.will_groups_cycle(group.id, to.id):
+                    await context.reply(f"Error: could not group **{group.name}** to **{to.name}** as doing so will create a cyclic loop.")
+                    return
+
+            for group in items_list:
                 await Database.instance.update_group_parent(group.id, to.id)
 
         await context.reply("", [Embed(
