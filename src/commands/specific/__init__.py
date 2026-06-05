@@ -131,7 +131,7 @@ class TemplateStrategy(Strategy):
 
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Template:
         string = await StringStrategy().parse(stream, argument, context)
-        if "text" in string and "{}" not in string:
+        if "text" in string and not ("{" in string and "}" in string):
             string = string.replace("text", "{}", 1)
             await context.reply(f"Note: {Config.instance.name} uses `{'{}'}` for placeholders instead of `text`. Your input has been auto-coerced to use `{'{}'}`.")
 
