@@ -48,7 +48,7 @@ class Interactions:
     def __repr__(self):
         return f"Interactions({self.react_interactions!r})"
 
-    async def wait_claim_after(self, timeout: int, message_id: int, platform: Platform) -> bool:
+    async def wait_claim_after(self, timeout: float, message_id: int, platform: Platform) -> bool:
         await sleep(timeout)
         if (message_id, platform) in self.react_interactions:
             self.react_interactions.pop((message_id, platform))

@@ -100,11 +100,12 @@ def setup():
 
         await paged_proxy_list(
             context,
-            [user_proxies[i] for i in sorted_distances],
+            [user_proxies[i] for i in sorted_distances if sorted_distances[i] <= 5],
             f"Proxy Search: **{name}**",
             0,
             context.channel.dm,
-            additional_embeds
+            additional_embeds,
+            False
         )
 
 

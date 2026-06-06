@@ -128,7 +128,7 @@ async def paged_proxy_group_list(context: Context, groups: list[ProxyGroup], tit
     )
 
 
-async def paged_proxy_list(context: Context, proxies: list[Proxy], title: str, page: int, detailed: bool, additional_embeds: list[Embed] = None):
+async def paged_proxy_list(context: Context, proxies: list[Proxy], title: str, page: int, detailed: bool, additional_embeds: list[Embed] = None, show_groups: bool = True):
     if not proxies:
         await context.reply("", [Embed(
             f"{title} (0 total)",
@@ -146,7 +146,7 @@ async def paged_proxy_list(context: Context, proxies: list[Proxy], title: str, p
         return
 
     pages = []
-    if preferences.public_group or detailed:
+    if (preferences.public_group or detailed) and show_groups:
         groups = set(proxy.group for proxy in proxies)
         if None in groups: groups.remove(None)
         groups = sorted(groups, key=lambda g: g.id)
@@ -220,11 +220,11 @@ async def paged(context: Context, title: str, pages: list[str], start_page: int,
                 page = max(min(page, len(pages) - 1), 0)
                 await message.edit("", embeds=[await get_page(page)] + (additional_embeds or []))
 
-            if len(pages) != 1:
-                if page == len(pages) - 1:
-                    await message.remove_reaction(RIGHT)
-                elif page == 0:
-                    await message.remove_reaction(LEFT)
+                if len(pages) != 1:
+                    if page == len(pages) - 1:
+                        await message.remove_reaction(RIGHT)
+                    elif page == 0:
+                        await message.remove_reaction(LEFT)
 
             return False
 
