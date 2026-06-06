@@ -1,7 +1,6 @@
 from ..generic import make_command, Argument, make_command_group, get_commands, get_command_groups, CommandGroup
 from ..generic.strategies import OneOf, OptionList, Optional
 from ...backend.config import Config
-from ...service import Channel
 
 bot_group: CommandGroup
 

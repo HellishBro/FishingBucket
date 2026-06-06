@@ -262,8 +262,9 @@ class URLStrategy(Strategy):
 
 
 class OneOf(Strategy):
-    def __init__(self, *strats: Strategible):
+    def __init__(self, *strats: Strategible, fatal: bool = False):
         self.strats = [strategize(strat) for strat in strats]
+        self.fatal = fatal
 
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> Any:
         start = stream.pos
@@ -272,6 +273,9 @@ class OneOf(Strategy):
                 return await strat.parse(stream, argument, context)
             except SyntaxParseError:
                 stream.pos = start
+
+        if self.fatal:
+            raise SyntaxParseError(f"none of {len(self.strats)} alternatives matched")
         raise ParseError(f"none of {len(self.strats)} alternatives matched")
 
     def example(self) -> str:
@@ -340,12 +344,14 @@ class Optional(Strategy):
 class List(Strategy):
     accept_end_of_stream = True
 
-    def __init__(self, datatype: Strategible, minimum: int = 0):
+    def __init__(self, datatype: Strategible, minimum: int = 0, fatal: bool = False):
         self.datatype = strategize(datatype)
         self.minimum = minimum
+        self.fatal = fatal
 
     async def parse(self, stream: CharacterStream, argument: ParsingArgument, context: Context) -> list[Any]:
         l = []
+        before_whitespace = stream.pos
         while not stream.end:
             start = stream.pos
             try:
@@ -353,8 +359,16 @@ class List(Strategy):
             except SyntaxParseError:
                 stream.pos = start
                 break
+
+            before_whitespace = stream.pos
             stream.expect_argument_end()
+
+        stream.pos = before_whitespace
+
         if len(l) < self.minimum:
+            if self.fatal:
+                raise SyntaxParseError(f"expected at least {self.minimum} elements, got {len(l)}")
+
             raise ParseError(f"expected at least {self.minimum} elements, got {len(l)}")
 
         return l

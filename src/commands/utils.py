@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Callable
 
-from .generic import get_command_invocation
+from .generic import get_command_invocation, EarlyExitException
 from .specific import get_uid
 from ..backend.database import Database, UserPreference
 from ..backend.models import Proxy, ProxyGroup
@@ -9,6 +9,7 @@ from ..backend.template_utils import Template, TextPart
 from ..backend.utils import format_date
 from ..interaction import Interactions, Interaction
 from ..service import Context, Embed, ReactionActionEvent
+from ..service.common import Permissions
 
 
 def get_smart_pages[T](everything: list[T], function: Callable[[list[T]], tuple[str, int]], page_preface: str = "", limits: int = 5) -> list[str]:
@@ -247,3 +248,12 @@ def example_trigger_text(trigger: Template) -> str:
         else:
             res += "hello"
     return res
+
+
+async def require_permissions(context: Context, predicate: Callable[[Permissions], bool]):
+    member = await context.get_member(context.author.id)
+    channel = await context.get_channel(context.message.channel_id)
+    permissions = await channel.permissions_for(member)
+    if not predicate(permissions):
+        await context.reply(f"Error: you do not have the required permissions to use this command!")
+        raise EarlyExitException()

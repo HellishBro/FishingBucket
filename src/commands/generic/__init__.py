@@ -104,7 +104,7 @@ async def parse_command_arguments(clean_string: str, arguments: list[Argument], 
             try:
                 stream.expect_argument_end()
             except ParseError as e:
-                raise ParseError(f"error transitioning to argument #{idx + 1}: {e.message}")
+                raise ParseError(f"error transitioning to argument #{idx + 2}: {e.message}")
 
     return results
 

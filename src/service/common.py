@@ -343,6 +343,10 @@ class Permissions(ABC):
     @abstractmethod
     def manage_messages(self) -> bool: pass
 
+    @property
+    @abstractmethod
+    def manage_guild(self) -> bool: pass
+
 
 class Context(ABC):
     def __init__(self, platform: Platform, bot: Bot, message: Message):

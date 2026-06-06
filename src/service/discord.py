@@ -440,6 +440,10 @@ class Permissions(c.Permissions):
     def manage_messages(self) -> bool:
         return self.raw & 0x8 == 0x8 or self.raw & 0x2000 == 0x2000
 
+    @property
+    def manage_guild(self) -> bool:
+        return self.raw & 0x8 == 0x8 or self.raw & 0x20 == 0x20
+
 
 class Context(c.Context):
     def __init__(self, message: Message, bot: discord.Bot):
