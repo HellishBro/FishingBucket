@@ -1,4 +1,4 @@
-from typing import Callable, Any
+from typing import Callable, Any, TYPE_CHECKING
 import celpy
 from dataclasses import dataclass
 
@@ -6,7 +6,9 @@ import re
 
 from .cache import TTLCache
 from .config import Config
-from ..service import Context
+
+if TYPE_CHECKING:
+    from ..service import Context
 
 
 @dataclass

@@ -1,8 +1,5 @@
 import random
-import re
-import time
 from dataclasses import dataclass
-from datetime import datetime
 import json
 
 from .template_utils import Template
@@ -36,35 +33,6 @@ class ProxyGroup:
     def from_database(cls, data: tuple[int, str, str, int, float, str, int], parent: ProxyGroup | None) -> ProxyGroup:
         return cls(ID(data[0]), data[1], data[2], data[3], data[4], data[5], parent)
 
-    @classmethod
-    def from_tupper(cls, group: dict, owner: int) -> dict[int, ProxyGroup]:
-        return {
-            group["id"]: ProxyGroup(
-                None,
-                group["name"],
-                group["description"] or "",
-                owner,
-                time.time(),
-                ("{} " + sanitize(group["tag"])) if group.get("tag") else "",
-                None
-            )
-        }
-
-    @classmethod
-    def from_pk(cls, group: dict, owner: int) -> ProxyGroup:
-        return ProxyGroup(
-            None,
-            group["name"],
-            group["description"] or "",
-            owner,
-            datetime.fromisoformat(group["created"]).timestamp() if group["created"] else time.time(),
-            "",
-            None
-        )
-
-def sanitize(potential_template: str) -> str:
-    return potential_template.replace("{", "\\{").replace("}", "\\}")
-
 @dataclass
 class Proxy:
     id: ID | None
@@ -91,68 +59,6 @@ class Proxy:
             group = [g for g in groups if g.id == data[8]][0]
 
         return cls(ID(data[0]), data[1], data[2], data[3], data[4].split("\n"), data[5], data[6], data[7], group, data[9], json.loads(data[10] or "{}"), data[11])
-
-    @classmethod
-    def from_tupper(cls, tupper: dict, owner: int, groups: dict[int, ProxyGroup]) -> Proxy:
-        brackets = []
-        for i in range(0, len(tupper["brackets"]), 2):
-            brackets.append(sanitize(tupper["brackets"][i]) + "{}" + sanitize(tupper["brackets"][i + 1]))
-
-        nick = tupper.get("nick")
-        if tag := tupper.get("tag"):
-            if nick:
-                nick += " " + tag
-            else:
-                nick = tupper["name"] + " " + tag
-
-        return cls(
-            None,
-            tupper["name"],
-            tupper["description"] or "",
-            tupper["avatar_url"] or Proxy.random_avatar(),
-            brackets,
-            owner,
-            tupper["posts"] or 0,
-            datetime.fromisoformat(tupper["created_at"]).timestamp() if tupper["created_at"] else time.time(),
-            groups.get(tupper["group_id"]),
-            nick,
-            {},
-            None
-        )
-
-    @classmethod
-    def from_pk(cls, pluralkit: dict, owner: int) -> Proxy | None:
-        return cls(
-            None,
-            pluralkit["name"],
-            pluralkit["description"] or "",
-            pluralkit["avatar_url"] or Proxy.random_avatar(),
-            [sanitize(i["prefix"] or "") + "{}" + sanitize(i["suffix"] or "") for i in pluralkit["proxy_tags"]] or [],
-            owner,
-            pluralkit["message_count"],
-            datetime.fromisoformat(pluralkit["created"]).timestamp() if pluralkit["created"] else time.time(),
-            None,
-            pluralkit["display_name"],
-            {},
-            None
-        )
-
-    @classmethod
-    def from_utter(cls, utter: dict, owner: int) -> Proxy | None:
-        return cls(
-            None,
-            utter.get("name", ""),
-            utter.get("description", ""),
-            utter.get("avatar_url", "") if is_valid_url(utter.get("avatar_url", "")) else Proxy.random_avatar(),
-            [sanitize(i["prefix"] or "") + "{}" + sanitize(i["suffix"] or "") for i in utter["proxy_tags"]] or [],
-            owner,
-            0,
-            time.time(),
-            None,
-            utter.get("display_name", None),
-            {},
-            None
-        )
 
     @property
     def effective_name(self) -> str:
@@ -188,41 +94,3 @@ class Proxy:
     @property
     def effective_avatar(self) -> str:
         return self.forms.get(self.current_form, self.avatar_url)
-
-
-class optional_type:
-    def __init__(self, ot: command_types):
-        self.optional_type = ot
-
-class one_or_more:
-    def __init__(self, ot: command_types):
-        self.original_type = ot
-
-class alternative:
-    def __init__(self, *alternatives: command_types):
-        self.alternatives = alternatives
-
-class string_with_length:
-    def __init__(self, length: int):
-        self.length = length
-
-type command_types = type | object | optional_type | optional_type | alternative | string_with_length
-
-
-@dataclass
-class Command:
-    shape: list[command_types]
-    name: str
-    description: str
-    usage: str
-    examples: list[str]
-    editing: bool | None
-
-@dataclass
-class CommandGroup:
-    name: str
-    description: str
-    commands: dict[tuple[str, bool | None], Command]
-
-    def register(self, command: Command):
-        self.commands[command.name, command.editing] = command

@@ -89,14 +89,6 @@
       "type": "integer",
       "description": "The bot's own user ID."
     },
-    "bio": {
-      "type": "object",
-      "description": "A mapping of the bot's bio states.",
-      "additionalProperties": {
-        "type": "string",
-        "description": "A Template to set for the bot's bio."
-      }
-    },
     "api_server": {
       "type": "object",
       "description": "Configuration for the API server.",
@@ -163,6 +155,30 @@
           "description": "The URL of the Contact Us page."
         }
       }
+    },
+    "discord": {
+      "type": "object",
+      "description": "Discord branch information.",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "The token of the bot."
+        },
+        "server_invite": {
+          "type": "string",
+          "format": "uri",
+          "description": "The invite link to the support server."
+        },
+        "server_id": {
+          "type": "integer",
+          "description": "The server ID of the support server."
+        },
+        "bot_invite": {
+          "type": "string",
+          "format": "uri",
+          "description": "The bot invite link."
+        }
+      }
     }
   },
   "allOf": [
@@ -178,9 +194,9 @@
             "donation",
             "user_token",
             "client_id",
-            "bio",
             "api_server",
-            "website"
+            "website",
+            "discord"
           ]
         }
       }
