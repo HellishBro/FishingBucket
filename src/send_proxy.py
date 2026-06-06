@@ -58,19 +58,21 @@ async def get_proxied_messages(message: str, user_id: int, autoproxy_preferences
     return res
 
 
-@TTLCache(2048, 3600).cache_async(["channel_id"])
+webhook_cache = TTLCache[int, Webhook](2048, 3600)
+
+
 async def get_webhook(context: Context) -> Webhook:
+    if webhook := webhook_cache.get(context.message.channel_id): return webhook
     webhook = None
 
-    print(context.message.channel_id)
     if webhook_id := await Database.instance.get_channel_webhook(context.message.channel_id, context.platform):
-        print(webhook_id, context.message.channel_id)
         webhook = await context.get_bot.get_webhook(webhook_id)
 
     if webhook is None:
         webhook = await context.channel.create_webhook(Config.instance.webhook)
         await Database.instance.put_channel_webhook_link(context.message.channel_id, webhook.id, context.platform)
 
+    webhook_cache.set(context.message.channel_id, webhook)
     return webhook
 
 async def send_proxy_message(proxy: Proxy, message: str, context: Context, attachments: list[Attachment], mention: bool, do_reply: bool) -> Context:
