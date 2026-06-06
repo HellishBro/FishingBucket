@@ -1,261 +1,249 @@
-import time
-import fluxer
-from textdistance import damerau_levenshtein
+from datetime import datetime, timedelta
+from typing import Literal
 
-from .utils import proxy_username, paged_proxy_list, ensure_own_proxy, get_proxies_text, require_reply, valid_template, \
-    example_trigger_text, get_uid
-from .. import response
-from ..backend.database import Database, Platform, Guild
-from ..commands import register_command, register_group
-from ..interaction import Interactions
-from ..interactions_impl import show_proxy_info
-from ..backend.models import optional_type, Proxy, alternative
-from ..send_proxy import reproxy as proxy_reproxy, edit_proxy_message
-from ..backend.utils import get_guild_id_from_channel, normalize_emojis, edit_webhook
+from textdistance import damerau_levenshtein as edit_distance
+
+from .generic import hook_command
+from .specific import get_uid
+from .utils import example_trigger_text, paged_proxy_list, get_proxies_text
+from ..backend.database import Database, MessageLink
+from ..backend import database as db
+from ..backend.models import Proxy
+from ..backend.template_utils import Template
+from ..backend.utils import normalize_emojis
+from ..send_proxy import reproxy, get_webhook, edit_proxy_message
+from ..service import Context, Embed, Webhook
 
 
-def setup(bot: fluxer.Bot):
-    register_group("proxy", "Proxy Commands", "Commands related to creating, getting, and using proxies.")
-
-    @register_command([proxy_username, str], bot, "register", """
-    Registers a proxy to be used.
-    The trigger is a string that contains `{}` somewhere.
-    Proxy avatar can be set by attaching an image to the message.
-    """, "register <name> <trigger>",['register Example example says {}', 'register "Long name" ln: {}'], "proxy", ["r"])
-    async def register(message: fluxer.Message, name: str, trigger: str):
-        if not await valid_template(message, "Trigger", trigger, ["text"]): return
-
+def setup():
+    @hook_command("register")
+    async def _(context: Context, name: str, trigger: Template):
         name = normalize_emojis(name)
 
-        if not message.attachments:
+        if not context.message.attachments:
             avatar_url = Proxy.random_avatar()
         else:
-            avatar_url = message.attachments[0].url
+            avatar_url = context.message.attachments[0].url
 
-        new_proxy = await Database.instance.put_proxy(Proxy(None, name, "", avatar_url, [trigger], await get_uid(message), 0, time.time(), None, "", {}, None))
-        hex_id = str(hex(new_proxy.id))[2:].lower()
-        embed = fluxer.Embed(
-            f"{name} (`{hex_id}`)",
-            f"Proxy **{name}** registered with an ID of `{hex_id}`!\nSay hello with it by typing `{example_trigger_text(trigger)}`!"
+        new_proxy = await Database.instance.put_proxy(
+            Proxy(
+                None,
+                name,
+                "",
+                avatar_url,
+                [trigger.string],
+                await get_uid(context, True),
+                0,
+                datetime.now().timestamp(),
+                None,
+                "",
+                {},
+                None
+            )
         )
-        embed.set_thumbnail(url=avatar_url)
-        await response.respond(message, "", [embed])
+
+        embed = Embed(
+            f"{name} (`{new_proxy.id}`)",
+            f"Proxy **{name}** is registered with an ID of `{new_proxy.id}`!\nSay hello with it by typing `{example_trigger_text(trigger)}`",
+            thumbnail_url=avatar_url
+        )
+        await context.reply("", [embed])
 
 
-    @register_command([optional_type(fluxer.User), optional_type(int)], bot, "list", """
-    Lists your registered proxies.
-    If `user` is provided, it will display the proxies of that user, and if not provided, it will default to your proxies.
-    If `page` is provided, it will display the proxies on that page number. Defaults to 1.
-    """, "list [user] [page]", ["list", "list 4", "list @Gordon", "list @Phil 43"], "proxy", ["l"])
-    async def list_(message: fluxer.Message, user: fluxer.User | None, page: int | None):
-        uid = await Database.instance.get_user_id(user.id if user else message.author.id, Platform.Fluxer)
-        name = user.display_name if user else message.author.display_name
-        if (await Database.instance.get_user_preferences(uid)).private_list and user and user.id != message.author.id:
-            await response.respond(message, "That user have a private proxy list!")
-            return
-
-        detailed = False
-        if (await get_guild_id_from_channel(bot, message.channel_id)) is None:
-            detailed = True
+    @hook_command("list")
+    async def _(context: Context, page: int, detailed: bool):
+        uid = await get_uid(context)
 
         await paged_proxy_list(
-            message,
+            context,
             await Database.instance.get_user_proxies(uid),
-            f"Registered Proxies of {name}",
+            f"Registered Proxies of {context.author.display_name}",
             page,
-            detailed
+            context.channel.dm or detailed
         )
 
 
-    @register_command([str, optional_type(int)], bot, "find", """
-    Finds all your proxies matching a name.
-    If `page` is provided, it will display the proxies on that page number. Defaults to 1.
-    The `name` is searched via fuzzy text searching. It will match if any portion of the name is matched, regardless of capitalization.
-    """, "find <name> [page]", ['find Example', 'find "Usain Bolt" 2'], "proxy", ["f"])
-    async def find(message: fluxer.Message, name: str, page: int | None):
-        detailed = False
-        if (await get_guild_id_from_channel(bot, message.channel_id)) is None:
-            detailed = True
+    @hook_command("find")
+    async def _(context: Context, name: str):
+        owner = await get_uid(context)
 
-        name = normalize_emojis(name)
+        norm_name = normalize_emojis(name)
+        user_proxies = await Database.instance.get_user_proxies(owner)
 
-        proxies = await Database.instance.get_user_proxies(await get_uid(message))
-        proxies = [proxy for proxy in proxies if (name.lower() in proxy.name.lower()) or (name.lower() in (proxy.nickname or "").lower())]
+        errors = []
+
         distances = {
             i: min(
-                damerau_levenshtein(name.lower(), valid_proxy.name.lower()),
-                damerau_levenshtein(name.lower(), (valid_proxy.nickname or valid_proxy.name).lower())
-            ) for i, valid_proxy in enumerate(proxies)
+                edit_distance(
+                    norm_name.lower(), candidate.name.lower()
+                ),
+                edit_distance(
+                    norm_name.lower(), (candidate.nickname or candidate.name).lower()
+                )
+            )
+            for i, candidate in enumerate(user_proxies)
         }
-        distances = {k: v for k, v in distances.items() if v <= 5}
         sorted_distances = dict(sorted(distances.items(), key=lambda kv: kv[1]))
-        sorted_indices = sorted_distances.keys()
-        sorted_proxies = []
-        for index in sorted_indices:
-            sorted_proxies.append(proxies[index])
+
+        minimum_distance = min(distances.items(), key=lambda kv: kv[1])
+        if minimum_distance[1] > 5:
+            errors.append("- No name is close enough to the search term.")
+        if [*distances.values()].count(minimum_distance[1]) > 1:
+            errors.append("- There are two or more proxies with the same degree of similarity in name.")
+
+        additional_embeds = []
+        if errors:
+            additional_embeds.append(Embed(
+                "Errors",
+                "\n".join(errors)
+            ))
 
         await paged_proxy_list(
-            message,
-            sorted_proxies,
+            context,
+            [user_proxies[i] for i in sorted_distances if sorted_distances[i] <= 5],
             f"Proxy Search: **{name}**",
-            page,
-            detailed
+            0,
+            context.channel.dm,
+            additional_embeds,
+            False
         )
 
 
-    @register_command([str], bot, "reproxy", """
-    Changes the proxy of your message in this channel.
-    This will delete and resend your previous proxied message in this channel.
-    Alternatively, reply to a message to reproxy that message instead.
-    """, "reproxy <new proxy>", ["reproxy 69ed73"], "proxy", ["rp"])
-    async def reproxy(message: fluxer.Message, new_id: str):
-        channel_id = message.channel_id
-        if message.referenced_message:
-            message_id = message.referenced_message.id
-            proxy_id = (await Database.instance.get_message_link(message_id, channel_id)).proxy_id
-            old_proxy = await ensure_own_proxy(message, proxy_id)
-            if not old_proxy: return
+    @hook_command("info")
+    async def _(context: Context, proxy: Proxy, detailed: bool = False):
+        uid = await get_uid(context)
+
+        detailed = context.channel.dm or detailed
+
+        await context.reply("", [Embed(
+            proxy.name,
+            get_proxies_text(
+                [proxy],
+                await Database.instance.get_user_preferences(uid),
+                detailed
+            )[0],
+            thumbnail_url=proxy.effective_avatar
+        )])
+
+
+    @hook_command("reproxy")
+    async def _(context: Context, proxy: Proxy):
+        owner = await get_uid(context)
+
+        if ref := await context.message.get_reference():
+            message_id = ref.id
+            message = ref
         else:
-            message_id = await Database.instance.get_latest_proxy_message_from_user(channel_id, message.author.id)
-            if not message_id:
-                m = await response.respond(message, "There are no proxied messages from you in this channel! This message will expire in 15 seconds.")
-                if await Interactions.instance.wait_claim_after(15, m.id, m.author.id):
-                    await response.delete_message(m)
-                    await message.delete()
+            message_id = await Database.instance.get_latest_proxy_message_from_user(context.channel.id, owner, context.platform)
+            if (message := await context.channel.get_message(message_id)) is None or not message_id:
+                await context.reply("Error: there are no previous proxied messages from you in this channel!")
                 return
-            proxy_id = (await Database.instance.get_message_link(message_id, channel_id)).proxy_id
-            old_proxy = await Database.instance.get_proxy(proxy_id)
 
-        new_proxy = await ensure_own_proxy(message, new_id)
-        if not new_proxy: return
-        parent = await bot.fetch_message(str(channel_id), str(message_id))
-        await message.delete()
-        await proxy_reproxy(parent, bot, old_proxy, new_proxy, message.author.id, Platform.Fluxer)
+        message_link: MessageLink = await Database.instance.get_message_link(message_id, context.channel.id)
+        proxy_id = message_link.proxy_id
+        old_proxy = await Database.instance.get_proxy(proxy_id)
 
-    @register_command([alternative(bool, str), alternative("global", "community"), optional_type(alternative(float, "never"))], bot, "autoproxy", """
-    Automatically proxies your messages.
-    Autoproxy set to `true` or `latch` will proxy your messages as your last used proxy.
-    If it is an ID, all messages will be sent as that proxy.
-    You can still use proxies normally. Any explicit proxy message will override the autoproxy for that message only.
-    If `expires` is set, then the autoproxy will automatically expire after `expires` seconds.
-    The mode can be "all" if and only if autoproxy is being disabled.
-    """, 'autoproxy <"latch" OR enabled OR proxy> <"global" OR "community" OR "all"> [expires OR "never"]', ["autoproxy latch global", "autoproxy off community", "autoproxy 69ed73 global 3600"], "proxy", ["ap", "auto"])
-    async def autoproxy(message: fluxer.Message, setting: str | bool, mode: str, expires: float | str | None):
-        if setting in ("latch", "enable", "enabled"):
+        if old_proxy.owner != owner:
+            await context.reply("Error: you do not own the original proxy!")
+            return
+
+        await context.message.delete()
+        await reproxy(message.context, old_proxy, proxy)
+
+
+    @hook_command("autoproxy")
+    async def _(context: Context, setting: Proxy | Literal["latch"] | bool, mode: Literal["global"] | Literal["community"] | None, expires: timedelta | Literal["never"]):
+        if setting == "latch":
             setting = True
-        elif setting in ("disable", "disabled"):
-            setting = False
+
         if expires == "never":
-            expires = None
-        if mode == "global" or mode == "all":
-            guild_id = 0
+            expiration = None
+        else:
+            expiration = expires.total_seconds()
+
+        if mode == "global" or mode is None:
+            guild = db.Guild(0, context.platform)
             postfix = "globally"
         else:
-            guild_id = await get_guild_id_from_channel(bot, message.channel_id)
+            guild = db.Guild(context.guild.id, context.platform)
             postfix = "in this community"
 
-        uid = await get_uid(message)
+        uid = await get_uid(context)
 
         if setting is True:
-            await Database.instance.set_autoproxy_preference(uid, Guild(guild_id, Platform.Fluxer), None, expires)
-            await response.respond(message, f"Autoproxy has been set to latch mode {postfix}!")
+            await Database.instance.set_autoproxy_preference(uid, guild, None, expiration)
+            await context.reply(f"Autoproxy has been set to latch mode {postfix}.")
         elif setting is False:
-            if mode == "all":
+            if mode is None:
                 await Database.instance.remove_all_autoproxy_preference(uid)
-                await response.respond(message, "Autoproxy has been turned off for everything.")
+                await context.reply("Autoproxy has been turned off for everything.")
                 return
 
-            await Database.instance.remove_autoproxy_preference(uid, Guild(guild_id, Platform.Fluxer))
-            await response.respond(message, f"Autoproxy has been turned off {postfix}.")
+            await Database.instance.remove_autoproxy_preference(uid, guild)
+            await context.reply(f"Autoproxy has been turned off {postfix}.")
         else:
-            if not (proxy := await ensure_own_proxy(message, setting)):
-                return
-            await Database.instance.set_autoproxy_preference(uid, Guild(guild_id, Platform.Fluxer), proxy.id, expires)
-            await response.respond(message, f"Autoproxying as **{proxy.name}** {postfix}.")
+            await Database.instance.set_autoproxy_preference(uid, guild, setting.id, expiration)
+            await context.reply(f"Autoproxying as **{setting.name}** {postfix}.")
 
 
-    @register_command([str], bot, "info", """
-    Shows you information about a proxy.
-    This proxy has to be owned by you.
-    """, "info <proxy>", ["info 69ed73"], "proxy", ["i"])
-    async def info(message: fluxer.Message, id_: str):
-        proxy = await ensure_own_proxy(message, id_)
-        if not proxy: return
-
-        detailed = False
-        if (await get_guild_id_from_channel(bot, message.channel_id)) is None:
-            detailed = True
-
-        embed = fluxer.Embed(
-            f"{proxy.name}",
-            get_proxies_text([proxy], await Database.instance.get_user_preferences(message.author.id), detailed)[0]
-        )
-        embed.set_image(url=proxy.effective_avatar)
-        await response.respond(message, "", [embed])
-
-
-    @register_command([], bot, "who", """
-    Shows you information about a proxy message.
-    This requires the command to be a reply to a message sent by a proxy.
-    Alternatively, react to the message with a :question:.
-    """, "who", ["who"], "proxy")
-    async def who(message: fluxer.Message):
-        if not (parent := await require_reply(message)): return
-        if embed := await show_proxy_info(bot, parent):
-            await message.author.send("", embeds=[embed])
-            await message.delete()
-        else:
-            m = await response.respond(message, "That message is not a proxied message! This message will expire in 15 seconds.")
-            if await Interactions.instance.wait_claim_after(15, m.id, m.author.id):
-                await response.delete_message(m)
-                await message.delete()
-
-
-    @register_command([], bot, "delete", """
-    Deletes a proxy message.
-    This require the command to be a reply to a message sent by a proxy **that you own**.
-    Alternatively, react to the message with a :x:.
-    """, "delete", ["delete"], "proxy")
-    async def delete(message: fluxer.Message):
-        if not (parent := await require_reply(message)): return
-        proxy_id = (await Database.instance.get_message_link(parent.id, parent.channel_id)).proxy_id
-        if proxy_id:
-            proxy = await Database.instance.get_proxy(proxy_id)
-            if proxy.owner == await get_uid(message):
-                await Database.instance.delete_link_message(parent.id, parent.channel_id)
-                await parent.delete()
-                await message.delete()
-                return
-            m = await response.respond(message, "You do not own this proxy! This message will expire in 15 seconds.")
-            if await Interactions.instance.wait_claim_after(15, m.id, m.author.id):
-                await response.delete_message(m)
-                await message.delete()
+    @hook_command("who")
+    async def _(context: Context):
+        if not (ref := await context.message.get_reference()):
+            await context.reply("Error: reply to a proxied message to use this command.")
             return
-        m = await response.respond(message, "That message is not a proxied message! This message will expire in 15 seconds.")
-        if await Interactions.instance.wait_claim_after(15, m.id, m.author.id):
-            await response.delete_message(m)
-            await message.delete()
+
+        lnk = await Database.instance.get_message_link(ref.id, ref.channel_id)
+        if lnk:
+            if proxy := await Database.instance.get_proxy(lnk.proxy_id):
+                e = Embed(
+                    "Proxied Message",
+                    f"**Proxy**: {proxy.name}\n**Owner**: <@{lnk.platform_user}> (`{lnk.platform_user}`)\n**Message Link**: [link]({await ref.mention()})\n**Message**:\n{'\n'.join(('> ' + ln) for ln in ref.content.split('\n'))}"
+                )
+                dm = await context.author.get_dm()
+                await dm.send("", [e])
+                await context.message.delete()
+                return
+
+        await context.reply("Error: that message is not a proxied message!")
 
 
-    @register_command([str], bot, "edit", """
-    Edits a proxy message.
-    This require the command to be a reply to a message sent by a proxy **that you own**.
-    """, "edit <message>", ["edit We grew apart..."], "proxy")
-    async def edit(message: fluxer.Message, new: str):
-        if not (parent := await require_reply(message)): return
-        proxy_id = (await Database.instance.get_message_link(parent.id, parent.channel_id)).proxy_id
-        if proxy_id:
-            proxy = await Database.instance.get_proxy(proxy_id)
-            if proxy.owner == await get_uid(message):
-                webhook_id = await Database.instance.get_channel_webhook(parent.channel_id, Platform.Fluxer)
-                if webhook_id:
-                    await message.delete()
-                    await edit_proxy_message(parent, bot, new)
-                    return
-            m = await response.respond(message, "You do not own this proxy! This message will expire in 15 seconds.")
-            if await Interactions.instance.wait_claim_after(15, m.id, m.author.id):
-                await response.delete_message(m)
+    @hook_command("delete")
+    async def _(context: Context, bypass: bool):
+        if not (ref := await context.message.get_reference()):
+            await context.reply("Error: reply to a proxied message to use this command.")
             return
-        m = await response.respond(message, "That message is not a proxied message! This message will expire in 15 seconds.")
-        if await Interactions.instance.wait_claim_after(15, m.id, m.author.id):
-            await response.delete_message(m)
+
+        lnk = await Database.instance.get_message_link(ref.id, ref.channel_id)
+        if lnk:
+            bypasses = bypass and (await context.channel.permissions_for(await context.get_member(context.author.id))).manage_messages
+
+            if (proxy := await Database.instance.get_proxy(lnk.proxy_id)) and (bypasses or proxy.owner == await get_uid(context)):
+                await Database.instance.delete_link_message(ref.id, ref.channel_id)
+                await ref.delete()
+                await context.message.delete()
+                return
+
+            await context.reply("Error: you do not own this proxy!")
+            return
+
+        await context.reply("Error: that message is not a proxied message!")
+
+
+    @hook_command("edit")
+    async def _(context: Context, message: str):
+        if not (ref := await context.message.get_reference()):
+            await context.reply("Error: reply to a proxied message to use this command.")
+            return
+
+        lnk = await Database.instance.get_message_link(ref.id, ref.channel_id)
+        if lnk:
+            if (proxy := await Database.instance.get_proxy(lnk.proxy_id)) and proxy.owner == (owner := await get_uid(context)):
+                await context.message.delete()
+                await edit_proxy_message(ref.context, message, lnk, owner)
+                return
+
+            await context.reply("Error: you do not own this proxy!")
+            return
+
+        await context.reply("Error: that message is not a proxied message!")
+

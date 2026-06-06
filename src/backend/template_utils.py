@@ -1,8 +1,14 @@
-from typing import Callable, Any
+from typing import Callable, Any, TYPE_CHECKING
 import celpy
 from dataclasses import dataclass
 
+import re
+
 from .cache import TTLCache
+from .config import Config
+
+if TYPE_CHECKING:
+    from ..service import Context
 
 
 @dataclass
@@ -22,17 +28,30 @@ class Cache:
     ParseCache = TTLCache(1024, 3600)
     ComputeCache = TTLCache(1024, 3600)
 
-functions: list[Callable] = []
-for cls in (str, ):
-    dirs = dir(cls)
-    for attr in dirs:
-        if not attr.startswith("_") and callable(getattr(cls, attr)):
-            functions.append(getattr(cls, attr))
-functions.extend([len, repr, str])
+functions: dict[str, Callable] = {
+    "size": len,
+    "repr": repr,
+    "str": str,
+    "upper": str.upper,
+    "lower": str.lower,
+    "replace": str.replace,
+    "contains": str.__contains__,
+    "slice": lambda this, a, b: this[a:b],
+    "startswith": str.startswith,
+    "endswith": str.endswith,
+    "split": str.split,
+    "trim": str.strip,
+    "strip": str.strip,
+    "find": str.find,
+    "_&&_": lambda a, b: a and b,
+    "_||_": lambda a, b: a or b,
+    "matches": lambda this, exp: re.fullmatch(exp, this)
+}
 
 class Template:
     def __init__(self, parts: list[TemplatePart], errors: list[str] = None):
         self.parts = parts
+        self.string: str | None = None
         self.errors: list[str] = errors or []
 
     @classmethod
@@ -99,6 +118,7 @@ class Template:
                 simplified.append(part)
 
         obj = cls(simplified, errors)
+        obj.string = string
         Cache.ParseCache.set(string, obj)
         return obj
 
@@ -106,16 +126,17 @@ class Template:
         return len([part for part in self.parts if isinstance(part, ExprPart)])
 
     @staticmethod
-    def evaluate_expr(expression: str, variables: dict, extra_functions: list = None) -> tuple[bool, str]:
+    def evaluate_expr(expression: str, variables: dict, extra_functions: dict[str, Callable] = None) -> tuple[bool, str]:
         environment = celpy.Environment()
         ast = environment.compile(expression)
         try:
-            program = environment.program(ast, functions=functions + (extra_functions or []))
+            program = environment.program(ast, functions=functions | (extra_functions or {}))
             result = program.evaluate(variables)
             if isinstance(result, str):
                 return True, result
             return False, ""
         except Exception as e:
+            print(e)
             return False, ""
 
     def _match(self, part_index: int, string: str, string_index: int, previous_match: str) -> MatchedResult:
@@ -142,7 +163,7 @@ class Template:
             def pre(this: str) -> str:
                 return previous_match + this
 
-            matched, content = self.evaluate_expr(part.content, {"text": inside}, [pre])
+            matched, content = self.evaluate_expr(part.content, {"text": inside}, {"pre": pre})
 
         return MatchedResult(matched, content, new_string_index)
 
@@ -203,3 +224,13 @@ class Template:
 
         Cache.ComputeCache.set((self, variables, default), string)
         return string
+
+
+    @staticmethod
+    def get_default_metatext_variables(context: Context) -> dict:
+        return {
+            "config": Config.instance,
+            "context": {
+                "platform": context.platform.name
+            }
+        }

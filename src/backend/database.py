@@ -4,10 +4,10 @@ import aiosqlite as sql
 import time
 from collections import namedtuple
 from dataclasses import dataclass
-from enum import Enum, auto
 
 from .cache import TTLCache
-from .models import Proxy, ProxyGroup
+from .models import Proxy, ProxyGroup, ID
+from ..service import Platform
 
 lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner", "times_used", "creation_date", "proxy_group", "nickname", "proxy_forms", "current_form"]
 proxy_fields = ", ".join(lst_proxy_fields)
@@ -33,21 +33,6 @@ def upsert_query(table: str, key: str | Collection[str], key_check: Any | Collec
     params = tuple(key_checks) + tuple(defaults) + tuple(values) + tuple(key_checks)
     return sql_str, params
 
-class Platform(Enum):
-    Fluxer = auto()
-    Discord = auto()
-
-    def get(self) -> int:
-        if self == Platform.Fluxer:
-            return 0
-        else:
-            return 1
-
-    @classmethod
-    def from_(cls, id_: int) -> Platform:
-        return [Platform.Fluxer, Platform.Discord][id_]
-
-
 class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list private_forms dice_functions")):
     private_description: bool
     private_trigger: bool
@@ -56,6 +41,25 @@ class UserPreference(namedtuple("UserPreference", "private_description private_t
     private_list: bool
     private_forms: bool
     dice_functions: bytes
+
+    @property
+    def public_description(self) -> bool: return not self.private_description
+
+    @property
+    def public_trigger(self) -> bool: return not self.private_trigger
+
+    @property
+    def public_metadata(self) -> bool: return not self.private_metadata
+
+    @property
+    def public_group(self) -> bool: return not self.private_group
+
+    @property
+    def public_list(self) -> bool: return not self.private_list
+
+    @property
+    def public_forms(self) -> bool: return not self.private_forms
+
 
 class GuildPreference(namedtuple("GuildPreference", "disallow_by_default logging_channel dice_functions guild_type")):
     disallow_by_default: bool
@@ -241,6 +245,7 @@ class Database:
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_guild_id ON autoproxies (guild_id);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_autoproxies_user_id ON autoproxies (user_id);")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_accounts_query ON accounts (user_id, account_type);")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_group_parent ON proxy_groups (id, parent);")
         await self.connection.execute("PRAGMA journal_mode=WAL;")
         await self.connection.execute("PRAGMA synchronous=NORMAL;")
         await self.connection.execute("PRAGMA cache_size=-64000;") # 64MB cache
@@ -684,8 +689,10 @@ class Database:
 
         await self.set_global_data("version", str(version), version)
 
-    @Cache.user_id.cache_async()
     async def get_user_id(self, sso: int, platform: Platform = Platform.Fluxer, create: bool = True) -> int:
+        if dat := Cache.user_id.get((sso, platform)):
+            return dat
+
         async with self.connection.execute(
                 "SELECT owner FROM accounts WHERE user_id = ? AND account_type = ?",
                 (sso, platform.get())
@@ -700,9 +707,11 @@ class Database:
                         "INSERT INTO accounts (user_id, account_type, owner) VALUES (?, ?, ?)",
                         (sso, platform.get(), new_user_id)
                 ):
+                    Cache.user_id.set((sso, platform), new_user_id)
                     return new_user_id
             return -1
 
+        Cache.user_id.set((sso, platform), curs[0])
         return curs[0]
 
     async def link_accounts(self, user_id: int, sso_id: int, platform: Platform):
@@ -718,6 +727,17 @@ class Database:
                 (sso_id, platform.get())
         ):
             Cache.user_id.invalidate((sso_id, platform))
+
+    async def get_accounts(self, uid: int) -> list[tuple[int, Platform]]:
+        async with self.connection.execute(
+            "SELECT user_id, account_type FROM accounts WHERE owner = ?",
+                (uid, )
+        ) as cursor:
+            accounts = []
+            for row in await cursor.fetchall():
+                accounts.append((row[0], Platform.from_(row[1])))
+            return accounts
+
 
     async def get_autoproxy_preference(self, user_id: int, guild: Guild) -> UserAutoproxyPreference | None:
         if (ref := Cache.autoproxy_preferences.get((user_id, guild), 0)) is not 0:
@@ -817,10 +837,10 @@ class Database:
             else: return UserPreference(*res[1:])
 
     @Cache.latest_proxy_message_from_user.cache_async()
-    async def get_latest_proxy_message_from_user(self, channel_id: int, owner: int) -> int | None:
+    async def get_latest_proxy_message_from_user(self, channel_id: int, owner: int, platform: Platform) -> int | None:
         async with self.connection.execute(
-            "SELECT ml.message_id FROM message_links ml JOIN proxies p ON ml.proxy_id = p.id WHERE ml.channel_id = ? AND p.owner = ? ORDER BY ml.message_id DESC LIMIT 1",
-            (channel_id, owner)
+            "SELECT ml.message_id FROM message_links ml JOIN proxies p ON ml.proxy_id = p.id WHERE ml.channel_id = ? AND ml.platform_type = ? AND p.owner = ? ORDER BY ml.message_id DESC LIMIT 1",
+            (channel_id, platform.get(), owner)
         ) as cursor:
             res = await cursor.fetchone()
             if not res: return None
@@ -1009,7 +1029,7 @@ class Database:
             (proxy.name, proxy.description, proxy.avatar_url, "\n".join(proxy.triggers), proxy.owner, proxy.times_used, time.time(), proxy.group.id if proxy.group else None, proxy.nickname, json.dumps(proxy.forms), proxy.current_form)
         )
         await self.connection.commit()
-        proxy.id = cursor.lastrowid
+        proxy.id = ID(cursor.lastrowid)
         Cache.proxies_from_user.invalidate(proxy.owner)
         await cursor.close()
 
@@ -1024,7 +1044,7 @@ class Database:
         )
         await self.connection.commit()
 
-        group.id = cursor.lastrowid
+        group.id = ID(cursor.lastrowid)
         Cache.groups_from_user.invalidate(group.owner)
         await cursor.close()
 
@@ -1212,6 +1232,21 @@ class Database:
                 Cache.proxy_cache.set(id_, ret)
             return ret
 
+    async def will_groups_cycle(self, group_id: int, potential_new_group_parent_id: int) -> bool:
+        # excuse this chatgpt code
+        async with self.connection.execute("""
+        WITH RECURSIVE ancestors AS (
+            SELECT id, parent FROM proxy_groups WHERE id = ?
+            UNION ALL
+            SELECT g.id, g.parent
+            FROM proxy_groups g
+            INNER JOIN ancestors a ON a.parent = g.id
+        )
+        SELECT EXISTS (SELECT 1 FROM ancestors WHERE id = ?);
+        """, (potential_new_group_parent_id, group_id)) as cursor:
+            do_loop, = await cursor.fetchone()
+            return do_loop
+
     async def get_group(self, id_: int) -> ProxyGroup | None:
         if ret := Cache.group_cache.get(id_): return ret
 
@@ -1334,5 +1369,7 @@ class Database:
         DELETE FROM autoproxies WHERE user_id = ?
         """, (user, )):
             pass
+
+        Cache.user_id.clear(lambda k, v: v == user)
 
         await self.delete_data(user)

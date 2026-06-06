@@ -1,98 +1,73 @@
-import base64
-import gzip
 import json
-import traceback
-from io import BytesIO
 
-import fluxer
+import pydantic
+from aiohttp import ClientSession
 
-from .utils import get_uid
-from .. import response
+from .generic import hook_command
+from .specific import get_uid
 from ..backend.database import Database
-from ..commands import register_command, register_group
-from ..import_helper import import_tupperbox, import_native, import_pluralkit, export_native, import_utter
-from ..backend.models import optional_type
-from ..backend.utils import read_file
+from ..backend.import_system import NativeImporter, TupperboxImporter, PluralKitImporter, UtterImporter, NativeExporter
+from ..backend.models import ProxyGroup, Proxy
+from ..service import Context, Embed, File
 
-def setup(bot: fluxer.Bot):
-    register_group("io", "Import/Export Commands", "Save or load your proxies.")
 
-    @register_command([optional_type(str)], bot, "import", """
-    Imports exported proxy data.
-    This can be used to import from exports done by this bot or other similar programs.
-    The export file can be attached as an attachment or send as a link.
-    Duplicates are resolved by comparing names.
-
-    List of supported import targets:
-    - Fishing Bucket
-    - Tupperbox
-    - Pluralkit
-    - Utter
-    """, "import [file url]", ["import", "import https://example.com/proxies.json.gz.a85"], "io")
-    async def reimport(message: fluxer.Message, url: str | None):
-        if not message.attachments and not url:
-            await response.respond(message, "Error! No import file found!")
+def setup():
+    @hook_command("import")
+    async def _(context: Context, file: str | None, origin: str | None):
+        if not context.message.attachments and not file:
+            await context.reply("Error: no import file found.")
             return
 
-        if message.attachments:
-            first_attachment = message.attachments[0]
-            title = first_attachment.filename
-            contents = await read_file(first_attachment.url)
+        if file:
+            filename = file.split("?")[0].split("/")[-1]
+            async with ClientSession() as session:
+                async with session.get(file) as response:
+                    contents = await response.read()
         else:
-            title = url.split("?")[0].split("/")[-1]
-            contents = await read_file(url)
+            filename = context.message.attachments[0].filename
+            contents = await context.message.attachments[0].read()
 
-        owner = await get_uid(message)
+        origin = origin or (
+            "fishing_bucket" if "proxies" in filename and filename.endswith(".json") else
+            "tupperbox" if "tupper" in filename and filename.endswith(".json") else
+            "pluralkit" if "system" in filename and filename.endswith(".json") else
+            "utter" if "utter" in filename and filename.endswith(".json") else
+            None
+        )
 
-        if "tuppers" in title and title.endswith(".json"):
-            m = await response.respond(message, "Loading from Tupperbox!")
-            try:
-                res = json.loads(contents)
-                groups, proxies = import_tupperbox(res, owner)
-            except Exception as e:
-                print(f"{e} when loading from Tupperbox: {contents}")
-                await response.respond(message, "Error! Cannot load from Tupperbox! Is the uploaded file corrupted?")
-                await message.delete()
-                return
+        if origin is None:
+            await context.reply(f"Error: cannot guess import file origin with the filename {filename!r}.")
+            return
 
-        elif "proxies" in title and title.endswith(".a85"):
-            m = await response.respond(message, "Loading from Fishing Bucket!")
-            try:
-                res = json.loads(gzip.decompress(base64.a85decode(contents.encode("utf-8"))).decode("utf-8"))
-                groups, proxies = import_native(res, owner)
-            except Exception as e:
-                print(f"{e} when loading from Fishing Bucket: {contents}")
-                await response.respond(message, f"Error! Cannot load from Fishing Bucket! Is the uploaded file corrupted?")
-                await message.delete()
-                return
+        origin_names = {
+            "fishing_bucket": "Fishing Bucket",
+            "tupperbox": "Tupperbox",
+            "pluralkit": "PluralKit",
+            "utter": "Utter"
+        }
 
-        elif "utter" in title and title.endswith(".json"):
-            m = await response.respond(message, "Loading from Utter!")
-            try:
-                res = json.loads(contents)
-                groups, proxies = import_utter(res, owner)
-            except Exception as e:
-                print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
-                await response.respond(message, f"Error! Cannot load from Utter! Is the uploaded file corrupted?")
-                await message.delete()
-                return
+        confirmation = await context.reply(f"Importing from {origin_names[origin]}")
+        try:
+            await context.message.delete()
+        except: pass
 
-        elif "system" in title and title.endswith(".json"):
-            m = await response.respond(message, "Loading from Pluralkit!")
-            try:
-                res = json.loads(contents)
-                groups, proxies = import_pluralkit(res, owner)
-            except Exception as e:
-                print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
-                # print(f"{e} when loading from Pluralkit: {contents}")
-                await response.respond(message, f"Error! Cannot load from Pluralkit! Is the uploaded file corrupted?")
-                await message.delete()
-                return
+        owner = await get_uid(context, True)
 
+        if origin == "fishing_bucket":
+            cls = NativeImporter()
+        elif origin == "tupperbox":
+            cls = TupperboxImporter()
+        elif origin == "pluralkit":
+            cls = PluralKitImporter()
+        elif origin == "utter":
+            cls = UtterImporter()
         else:
-            await response.respond(message,
-                                   f"Error! Unrecognized format! Use `{bot.command_prefix}help import` to see a list of possible import targets!")
-            await message.delete()
+            raise Exception("unreachable")
+
+        try:
+            cls.import_data(contents, owner)
+        except (json.JSONDecodeError, pydantic.ValidationError) as e:
+            await confirmation.reply(f"Error: cannot parse file")
             return
 
         user_proxies = await Database.instance.get_user_proxies(owner)
@@ -101,9 +76,11 @@ def setup(bot: fluxer.Bot):
         updated_proxies = 0
         updated_groups = 0
 
-        inserted_proxy_instances = []
+        inserted_proxy_instances: list[Proxy] = []
+        inserted_group_instances: list[ProxyGroup] = []
 
-        for group in groups:
+        groups_queue: list[ProxyGroup] = []
+        for group in cls.groups:
             founds = [g for g in user_groups if g.name == group.name]
             if founds:
                 in_database = founds[0]
@@ -111,9 +88,18 @@ def setup(bot: fluxer.Bot):
                 await Database.instance.update_group_description(in_database.id, group.description)
                 updated_groups += 1
             else:
-                await Database.instance.put_group(group)
+                groups_queue.append(group)
 
-        for proxy in proxies:
+        while groups_queue:
+            to_remove: list[int] = []
+            for idx, group in enumerate(groups_queue):
+                if group.parent not in groups_queue:
+                    inserted_group_instances.append(await Database.instance.put_group(group))
+                    to_remove.append(idx)
+            for idx in sorted(to_remove, reverse=True):
+                groups_queue.pop(idx)
+
+        for proxy in cls.proxies:
             founds = [p for p in user_proxies if p.name == proxy.name]
             if founds:
                 in_database = founds[0]
@@ -125,37 +111,48 @@ def setup(bot: fluxer.Bot):
             else:
                 inserted_proxy_instances.append(await Database.instance.put_proxy(proxy))
 
-        inserted_proxies = len(proxies) - updated_proxies
-        inserted_groups = len(groups) - updated_groups
+        inserted_proxies = len(cls.proxies) - updated_proxies
+        inserted_groups = len(cls.groups) - updated_groups
 
-        await m.edit(
+        await confirmation.message.edit(
             f"Proxies loaded! Updated {updated_proxies} proxies and {updated_groups} groups, and inserted {inserted_proxies} new proxies and {inserted_groups} new groups!")
-        await message.delete()
 
-        description = "\n".join(
-            f"**{p.name}** (`{str(hex(p.id))[2:]}`)" for p in inserted_proxy_instances[:min(len(inserted_proxy_instances), 20)])
+        proxies_text = "\n".join(
+            f"- **{p.name}** (`{p.id}`)" for p in inserted_proxy_instances[:min(len(inserted_proxy_instances), 20)]
+        ) or "- No proxies were added!"
+
         if len(inserted_proxy_instances) > 20:
-            description += f"\n...... and {len(inserted_proxy_instances) - 20} more"
+            proxies_text += f"\n...... and {len(inserted_proxy_instances) - 20} more"
 
-        await m.reply("", embeds=[fluxer.Embed(f"{message.author.display_name}'s Newly Inserted Proxies",
-                                               description or "No additional proxies were inserted!").to_dict()])
+        groups_text = "\n".join(
+            f"- **{g.name}** (`{g.id}`)" for g in inserted_group_instances[:min(len(inserted_group_instances), 20)]
+        ) or "- No groups were added!"
 
-    @register_command([], bot, "export", """
-    Generates an export of your proxies.
-    This includes everything to import the proxy back into the bot.
-    """, "export", ["export"], "io")
-    async def export(message: fluxer.Message):
-        owner = await get_uid(message)
+        if len(inserted_group_instances) > 20:
+            groups_text += f"\n...... and {len(inserted_group_instances) - 20} more"
+
+        await confirmation.reply("", embeds=[
+            Embed(
+                f"{context.author.display_name}'s New Imports",
+                f"New proxies:\n{proxies_text}\n\nNew groups:\n{groups_text}"
+            )
+        ])
+
+
+    @hook_command("export")
+    async def _(context: Context):
+        owner = await get_uid(context)
         groups = await Database.instance.get_user_groups(owner)
         proxies = await Database.instance.get_user_proxies(owner)
-        jsoned = json.dumps(export_native(groups, proxies))
-        contents = base64.a85encode(gzip.compress(jsoned.encode("utf-8"))).decode("utf-8")
-        file = fluxer.File(
-            BytesIO(contents.encode("utf-8")),
-            filename="proxies.json.gz.a85"
+        exporter = NativeExporter(proxies, groups)
+        file = File(
+            exporter.filename,
+            "",
+            exporter.export_data()
         )
-        if message.guild_id:
-            await message.author.send("Proxies exported!", files=[file])
-            await response.respond(message, "I've sent your exported proxies into your DM!")
+        if not (await context.get_channel(context.message.channel_id)).dm:
+            dm = await context.author.get_dm()
+            await dm.send("Proxies exported!", files=[file])
+            await context.reply("I've sent your exported proxies into your DM!")
         else:
-            await message.reply("Proxies exported!", files=[file])
+            await context.reply("Proxies exported!", files=[file])

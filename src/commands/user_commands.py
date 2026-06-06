@@ -1,83 +1,26 @@
-import fluxer
-from fluxer.models import RawReactionActionEvent
+import asyncio
+import time
+from typing import Literal
 
-from . import register_group, register_command
-from .utils import get_uid
-from .. import response
-from ..backend.database import Database, Platform
-from ..backend.models import alternative, one_or_more
-from ..interaction import Interactions, Interaction, remove_reaction
+from lorem_text import lorem
 
-def setup(bot: fluxer.Bot):
-    register_group("user", "User Commands", "Miscellaneous commands related to account, user, and privacy settings.")
+from .generic import hook_command, get_command_invocation
+from .specific import get_uid
+from ..backend.config import Config
+from ..backend.database import Database
+from ..interaction import Interactions, Interaction
+from ..service import Context, Embed, ReactionActionEvent, Platform
+from ..service.server import PLATFORM_TO_SERVER
 
-    @register_command([fluxer.User], bot, "link", """
-    Links another account with yours.
-    The linked account and yours will share the same proxies, groups, and settings.
-    This will essentially forward all command usage done on that account to your current account.
-    """, "link <user>", ["link @BobAlt#2331"], "user")
-    async def link(message: fluxer.Message, user: fluxer.User):
-        if message.author.id == user.id:
-            await response.respond(message, "You cannot link yourself to yourself!")
-            return
-        if user.bot:
-            await response.respond(message, "You cannot link yourself to a bot!")
-            return
-        other = await Database.instance.get_user_id(user.id, Platform.Fluxer, False)
-        self = await Database.instance.get_user_id(message.author.id, Platform.Fluxer, False)
-        if other == self and other != -1:
-            await response.respond(message, "That account is already linked to you!")
-            return
-        if other != -1:
-            await response.respond(message, "That account cannot be linked to you!")
-            return
-        if self == -1:
-            await response.respond(message, "You do not have an account yet!")
-            return
+account_links: dict[str, tuple[int, tuple[int, Platform], float, str]] = {} # link code => (uid, (user_id, platform), timestamp, name)
+account_links_initiated_accounts: dict[tuple[int, Platform], float] = {} # (user_id, platform) => timestamp
 
-        m = await response.respond(message, "React to this message from the other account to link accounts!")
-        await m.add_reaction("✅")
 
-        async def cb(event: RawReactionActionEvent):
-            if event.emoji.name == "✅":
-                await Database.instance.link_accounts(await Database.instance.get_user_id(message.author.id), user.id, Platform.Fluxer)
-                await response.respond(message, f"Successfully linked <@{user.id}> with your account!")
-
-        Interactions.instance.add_interaction(m.id, Interaction(user.id, cb, 60))
-
-        if await Interactions.instance.wait_claim_after(60, m.id, user.id):
-            await m.edit("Account link confirmation expired!")
-            await remove_reaction(m, "✅")
-
-    @register_command([], bot, "unlink", """
-    Unlinks this account with the linked account.
-    This command must be ran on the linked account, not the parent account.
-    """, "unlink", ["unlink"], "user")
-    async def unlink(message: fluxer.Message):
-        parent = await Database.instance.get_user_id(message.author.id)
-        if parent == message.author.id:
-            await response.respond(message, "This account does not have a parent account!")
-        else:
-            await Database.instance.unlink_account(message.author.id, Platform.Fluxer)
-            await response.respond(message, f"Successfully unlinked this account with <@{parent}>!")
-
-    @register_command(
-        [],
-        bot, "privacy", """
-        Lists your privacy settings.
-        The options for privacy are:
-        - Proxy and group description (`description`)
-        - Proxy triggers (`triggers`)
-        - Proxy and group metadata (`metadata`)
-        - Proxy groups (`groups`)
-        - Proxy forms (`forms`)
-        - Or, simply viewing your proxies and groups at all (`list`)
-        
-        Using proxy or group list commands in bot DMs will show private fields.
-        """, 'privacy', ["privacy"], "user"
-    )
-    async def privacy_list(message: fluxer.Message):
-        preferences = await Database.instance.get_user_preferences(await get_uid(message))
+def setup():
+    @hook_command("privacy list")
+    async def _(context: Context):
+        uid = await get_uid(context)
+        preferences = await Database.instance.get_user_preferences(uid)
         pref_dict = {
             "private_description": False,
             "private_trigger": False,
@@ -101,31 +44,14 @@ def setup(bot: fluxer.Bot):
 
         public_options = [m[p] for p, v in pref_dict.items() if not v]
         private_options = [m[p] for p, v in pref_dict.items() if v]
-        await response.respond(message, "", [fluxer.Embed(
+        await context.reply("", [Embed(
             "Privacy List",
             f"Currently, your privacy settings are:\n\n**Public**: {', '.join(public_options) if public_options else '*N/A*'}\n**Private**: {', '.join(private_options) if private_options else '*N/A*'}"
         )])
 
-    @register_command(
-        [alternative("public", "private"), alternative("all", one_or_more(alternative("description", "triggers", "metadata", "groups", "list", "forms")))],
-        bot, "privacy set", """
-        Sets your privacy settings.
-        `mode` will set the provided options public/private.
-        The support options for privacy are:
-        - Proxy and group description (`description`)
-        - Proxy triggers (`triggers`)
-        - Proxy and group metadata (`metadata`)
-        - Proxy groups (`groups`)
-        - Proxy forms (`forms`)
-        - Or, simply viewing your proxies and groups at all (`list`)
-        
-        Using proxy or group list commands in bot DMs will show private fields.
-        """, 'privacy set <"public" OR "private"> <option(s) OR "all">', [
-            "privacy set public all",
-            "privacy set private description triggers"
-        ], "user"
-    )
-    async def privacy_set(message: fluxer.Message, mode: str, options: list[str] | str):
+
+    @hook_command("privacy set")
+    async def _(context: Context, status: Literal["private"] | Literal["public"], options: list[str] | Literal["all"]):
         if options == "all":
             options = ["description", "triggers", "metadata", "groups", "list", "forms"]
 
@@ -138,51 +64,156 @@ def setup(bot: fluxer.Bot):
             "forms": "private_forms"
         }
 
-        public = mode == "private"
+        public = status == "private"
         kwargs = {m[k]: public for k in options}
 
-        await Database.instance.set_user_preferences(await get_uid(message), **kwargs)
-        await response.respond(message, "", [fluxer.Embed(
+        await Database.instance.set_user_preferences(await get_uid(context), **kwargs)
+        await context.reply("", [Embed(
             "Privacy Set!",
-            f"Successfully set the following privacy options to **{mode}**: {", ".join(options)}."
+            f"Successfully set the following privacy options to **{status}**: {", ".join(options)}."
         )])
 
-    @register_command([], bot, "account reset", """
-    Deletes every information related to your account.
-    > [!CAUTION]
-    > This action is **irreversible**!
-    
-    Your account will cease to exist, and every proxy, proxy group, user settings, connected accounts, and others will cease to exist with it!
-    """, "account reset", ["account reset"], "user")
-    async def account_reset(message: fluxer.Message):
-        owner = await Database.instance.get_user_id(message.author.id, Platform.Fluxer, False)
-        if owner == -1:
-            await response.respond(message, "You don't have an account!")
+
+    @hook_command("link initiate")
+    async def _(context: Context):
+        key = (context.author.id, context.platform)
+        now = time.time()
+        if key in account_links_initiated_accounts and now - account_links_initiated_accounts[key] <= 120:
+            await context.reply(f"Error: you already have an outgoing link code. Redeem it or let it expire before creating a new one.")
             return
 
-        m = await response.respond(message,
-                                   f"> [!CAUTION]\n> Are you sure you want to **delete everything**? React to the :white_check_mark: to confirm. This message will expire in 10 seconds.")
-        await m.add_reaction("✅")
-        msg_id = int(m.id)
+        uid = await get_uid(context)
 
-        async def cb(event: RawReactionActionEvent):
-            if event.emoji.name == "✅":
-                m_ = await response.respond(m, "> [!CAUTION]\n> Are you really **sure**? This action cannot be undone. React to the :white_check_mark: to conform. This message will expire in 10 seconds.")
-                await m_.add_reaction("✅")
+        channel = await context.author.get_dm()
 
-                Interactions.instance.add_interaction(m_.id, Interaction(message.author.id, cb_2, 10))
+        new_code = lorem.words(10)
+        account_links_initiated_accounts[key] = now
+        account_links[new_code] = uid, key, now, "@" + context.author.full_tag
 
-                if await Interactions.instance.wait_claim_after(10, m_.id, message.author.id):
-                    await m_.edit("Account reset confirmation expired!")
-                    await remove_reaction(m_, "✅")
+        await channel.send(f"Execute this entire command from the account that you want to link from to complete the process!")
+        await channel.send(f"{Config.instance.prefixes[0]}link code {new_code}")
 
-        async def cb_2(event: RawReactionActionEvent):
-            if event.emoji.name == "✅":
+        this_channel = await context.get_channel(context.message.channel_id)
+        if not this_channel.dm:
+            await context.reply("I've sent you instructions in your DM!")
+
+        await asyncio.sleep(120)
+
+        if key in account_links_initiated_accounts:
+            await channel.send(f"Account link code expired.")
+            account_links_initiated_accounts.pop(key)
+            account_links.pop(new_code)
+
+
+    @hook_command("link code")
+    async def _(context: Context, code: str):
+        if code not in account_links:
+            await context.reply("Error: that is not a valid link code. Did you copy the entire command correctly?")
+            return
+
+        uid, parent_user, timestamp, name = account_links[code]
+
+        if parent_user == (context.author.id, context.platform):
+            await context.reply("Error: you cannot link yourself to yourself.")
+            return
+
+        self = await Database.instance.get_user_id(context.author.id, context.platform, False)
+        if uid == self:
+            await context.reply("Error: you are already linked with that account.")
+            return
+        if self != -1:
+            await context.reply("Error: you already have an account. Please delete your account or unlink to link.")
+            return
+
+        m = await context.reply(f"Are you sure you want to link with **{name}**? React with :white_check_mark: to confirm.")
+        await m.message.add_reaction("✅")
+
+        async def cb(event: ReactionActionEvent) -> bool:
+            if event.emoji == "✅":
+                await Database.instance.link_accounts(uid, context.author.id, context.platform)
+                await context.reply("Successfully linked your account!")
+
+                account_links.pop(code)
+                account_links_initiated_accounts.pop(parent_user)
+                return True
+            return False
+
+        now = time.time()
+        to = 120 - (now - timestamp)
+        Interactions.instance.add_interaction(m, Interaction(context.author.id, cb, to))
+
+        if await Interactions.instance.wait_claim_after(to, m.id, context.platform):
+            await m.message.edit("Account linking expired.")
+            await m.message.remove_reaction("✅")
+
+
+    @hook_command("link list")
+    async def _(context: Context):
+        uid = await get_uid(context)
+
+        accounts = await Database.instance.get_accounts(uid)
+        accounts_str = []
+
+        for account in accounts:
+            account_id, account_type = account
+            user = await PLATFORM_TO_SERVER[account_type].get_bot().get_user(account_id)
+            string = f"- {account_type.name}: {user.display_name} (@{user.full_tag})"
+            if account == (context.author.id, context.platform):
+                string += " (current)"
+
+            accounts_str.append(string)
+
+        channel = await context.author.get_dm()
+        await channel.send("", [Embed(
+            "Linked Accounts",
+            "Your linked accounts:\n" + "\n".join(accounts_str)
+        )])
+
+        this_channel = await context.get_channel(context.message.channel_id)
+        if not this_channel.dm:
+            await context.reply("I've sent your linked account information in your DM!")
+
+
+    @hook_command("unlink")
+    async def _(context: Context):
+        uid = await get_uid(context)
+        linkers = await Database.instance.get_accounts(uid)
+        if len(linkers) == 1:
+            await context.reply("Error: you cannot unlink the only remaining user.")
+            return
+
+        m = await context.reply("Are you sure you want to unlink yourself? React with :white_check_mark: to confirm. This message will expire in 20 seconds.")
+        await m.message.add_reaction("✅")
+
+        async def cb(event: ReactionActionEvent) -> bool:
+            if event.emoji == "✅":
+                await Database.instance.unlink_account(context.author.id, context.platform)
+                await context.reply("Successfully unlinked your account!")
+                return True
+            return False
+
+        Interactions.instance.add_interaction(m, Interaction(context.author.id, cb, 20))
+
+        if await Interactions.instance.wait_claim_after(20, m.id, context.platform):
+            await m.message.edit("Account unlinking process expired.")
+            await m.message.remove_reaction("✅")
+
+
+
+    @hook_command("account delete")
+    async def _(context: Context):
+        owner = await get_uid(context)
+
+        m = await context.reply(f"> [!CAUTION]\n> Are you sure you want to **delete everything**? React to the :white_check_mark: to confirm. This message will expire in 10 seconds.")
+        await m.message.add_reaction("✅")
+
+        async def cb(event: ReactionActionEvent):
+            if event.emoji == "✅":
                 await Database.instance.account_reset(owner)
-                await response.respond(message, f"Successfully deleted your account!")
+                await context.reply(f"Successfully deleted your account!")
 
-        Interactions.instance.add_interaction(msg_id, Interaction(message.author.id, cb, 10))
+        Interactions.instance.add_interaction(m, Interaction(context.author.id, cb, 10))
 
-        if await Interactions.instance.wait_claim_after(10, msg_id, message.author.id):
-            await m.edit("Account reset confirmation expired!")
-            await remove_reaction(m, "✅")
+        if await Interactions.instance.wait_claim_after(10, m.id, context.platform):
+            await m.message.edit("Account reset confirmation expired!")
+            await m.message.remove_reaction("✅")

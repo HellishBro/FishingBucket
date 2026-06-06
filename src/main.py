@@ -1,6 +1,5 @@
 import asyncio
 import traceback
-import fluxer
 import time
 
 from .backend.config import Config
@@ -8,9 +7,11 @@ from .backend.data_reader import DataReader
 from .backend.database import Database
 from .interaction import Interactions
 from .backend.cache import CacheStatus
-from . import commands, interactions_impl
-from .commands import command_impl
+from . import commands
 from .api_server import app as api_app, ApplicationContext
+from .startup import setup_events, setup_commands
+from .service.server import setup_instances
+
 
 def run(config_file: str):
     Config(config_file)
@@ -18,20 +19,15 @@ def run(config_file: str):
     DataReader(Config.instance.data_path)
     CacheStatus()
 
-    bot = fluxer.Bot(command_prefix=Config.instance.prefixes[0], intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
+    setup_commands.setup()
+    commands.setup_commands()
+
+    servers = setup_instances()
     Interactions()
 
-    if Config.instance.use_extras:
-        from .extras.down_runner import report_bot
-    else:
-        from .extras.nothing import no_op_coro as report_bot
-
     async def run_once():
-        starts = [asyncio.Future(), bot.start(Config.instance.token)]
-        ends = [bot.close()]
-        if Config.instance.use_extras:
-            from .extras.tips_service import tip_loop
-            starts.append(tip_loop(bot, lambda: interactions_impl.ready))
+        starts = [asyncio.Future()] + [server.start() for server in servers]
+        ends = [server.close() for server in servers]
         if Config.instance.api_server.enabled:
             starts.append(api_app.serve())
             ends.append(api_app.close())
@@ -48,8 +44,10 @@ def run(config_file: str):
         err = None
         try:
             asyncio.run(Database.instance.init())
-            command_impl.setup(bot)
-            interactions_impl.setup(bot)
+
+            for server in servers:
+                setup_events.setup(server)
+
             api_app.set_context(ApplicationContext(Database.instance, Config.instance))
             asyncio.run(run_once())
         except KeyboardInterrupt:
@@ -61,32 +59,22 @@ def run(config_file: str):
             print("".join(traceback.format_exception(type(be), be, be.__traceback__)))
             err = be
 
-        if not interactions_impl.ready:
+        readied = any(server.ready for server in servers)
+        if not readied:
             attempts += 1
         else:
             attempts = 0
 
         session_time = time.time() - start_time
         wait_sec = 10 + 10 * min(attempts, 30)
-        print(f"Resetting... error: {err}. Session time: {session_time:.2f}s, readied? {interactions_impl.ready}. Connection attempt {attempts}. Waiting for {wait_sec} seconds.")
+        print(f"Resetting... error: {err}. Session time: {session_time:.2f}s, readied? {readied}. Connection attempt {attempts}. Waiting for {wait_sec} seconds.")
         asyncio.run(Database.instance.close())
-        commands.clear()
-        interactions_impl.clear(bot)
+
+        for server in servers:
+            server.clear_events()
 
         error_guess = err.__class__.__name__
-        status = "down."
-        if isinstance(err, fluxer.errors.Forbidden):
-            error_guess = "API DISABLED"
-            status = f"Fluxer API is disabled. Retrying connection in {wait_sec} seconds."
-        elif isinstance(err, asyncio.TimeoutError):
-            error_guess = "CONNECTION TIMEOUT"
-            status = f"Fluxer API timeout. Retrying connection in {wait_sec} seconds."
-        elif isinstance(err, RuntimeError):
-            error_guess = "CONNECTION TIMEOUT"
-            status = f"Fluxer API timeout. Retrying connection in {wait_sec} seconds."
-
-        print(f"Error guess: {error_guess}, status: {status}")
-        asyncio.run(report_bot("down", status))
+        print(f"Error: {error_guess}.")
 
         time.sleep(wait_sec)
         print("Retrying connect...")
