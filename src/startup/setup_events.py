@@ -15,7 +15,7 @@ from ..backend.config import Config
 from ..commands.generic import get_command_awaitable, ParseError, EarlyExitException
 
 
-editing_proxy_messages: dict[tuple[int, Platform], Message] = {} # (user_id, platform) => message
+editing_proxy_messages: dict[tuple[int, Platform], tuple[int, Message]] = {} # (user_id, platform) => (channel id, message)
 handled_messages: dict[tuple[int, Platform], float] = {} # (message_id, platform) => timestamp
 
 
@@ -30,11 +30,10 @@ async def message_wrapper(context: Context):
 
 
 async def handle_message(context: Context):
-    channel = await context.get_channel(context.message.channel_id)
-
-    if channel.dm and (context.author.id, context.platform) in editing_proxy_messages:
-        editing_proxy_messages.pop((context.author.id, context.platform))
-        msg = editing_proxy_messages[context.author.id, context.platform]
+    key = (context.author.id, context.platform)
+    if key in editing_proxy_messages and editing_proxy_messages[key][0] == context.message.channel_id:
+        msg = editing_proxy_messages[key][1]
+        editing_proxy_messages.pop(key)
         lnk = await Database.instance.get_message_link(msg.id, msg.channel_id)
         uid = await Database.instance.get_user_id(context.author.id, context.platform, False)
         await edit_proxy_message(msg.context, context.content, lnk, uid)
@@ -97,7 +96,7 @@ async def handle_reaction(context: ReactionActionEvent, server: Server):
                 raw = await ctx.get_wh_message_data(ctx)
                 await channel.send(f"Editing message:\n```\n{raw.content}\n```")
                 await channel.send("Please enter the new content of the message here:")
-                editing_proxy_messages[user.id, ctx.platform] = ctx.message
+                editing_proxy_messages[user.id, ctx.platform] = channel.id, raw
                 await asyncio.sleep(120)
                 if (user.id, ctx.platform) in editing_proxy_messages:
                     await channel.send("Message edit request expired!")
