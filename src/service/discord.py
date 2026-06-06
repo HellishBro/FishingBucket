@@ -51,7 +51,7 @@ class User(c.User):
 
     @property
     def full_tag(self) -> str:
-        return self.raw.name if self.raw.discriminator == "0000" else (self.raw.name + "#" + self.raw.discriminator)
+        return self.raw.name if self.raw.discriminator == "0" else (self.raw.name + "#" + self.raw.discriminator)
 
     @property
     def display_name(self) -> str:
@@ -401,6 +401,12 @@ class Bot(c.Bot):
     @property
     def user(self) -> User:
         return User(self.raw.user, self.bot)
+
+    async def get_user(self, user_id: int) -> User | None:
+        try:
+            return User(await self.bot.fetch_user(user_id), self.bot)
+        except discord.HTTPException:
+            return None
 
     @property
     def guilds(self) -> list[Guild]:

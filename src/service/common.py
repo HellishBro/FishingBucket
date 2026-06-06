@@ -311,6 +311,9 @@ class Bot(ABC):
     def guilds(self) -> list[Guild]: pass
 
     @abstractmethod
+    async def get_user(self, user_id: int) -> User | None: pass
+
+    @abstractmethod
     async def get_webhook(self, webhook_id: int) -> Webhook | None: pass
 
 

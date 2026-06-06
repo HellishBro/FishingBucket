@@ -3,7 +3,7 @@ from typing import Awaitable, Any
 
 from textdistance import damerau_levenshtein as edit_distance
 
-from ..generic import CharacterStream, ParsingArgument, EarlyExitException
+from ..generic import CharacterStream, ParsingArgument, EarlyExitException, get_command_invocation
 from ..generic.data import Strategy, SyntaxParseError, ParseError
 from ..generic.misc import escape_string
 from ..generic.strategies import OneOf, HexadecimalStrategy, StringStrategy, IntegerStrategy
@@ -15,10 +15,13 @@ from ...backend.utils import normalize_emojis
 from ...service import Context
 
 
-async def get_uid(context: Context, create: bool = False, on_unregistered: Awaitable[Any] = None) -> int:
+async def get_uid(context: Context, create: bool = False, on_unregistered: Awaitable[Any] | type[Ellipsis] = None) -> int:
     uid = await Database.instance.get_user_id(context.author.id, context.platform, create)
-    if uid == -1 and on_unregistered:
-        await on_unregistered
+    if uid == -1 and on_unregistered is not ...:
+        if on_unregistered:
+            await on_unregistered
+        else:
+            await context.reply(f"Error: you do not have an account! You can create one by using the `{get_command_invocation('register')}` command.")
         raise EarlyExitException()
     return uid
 

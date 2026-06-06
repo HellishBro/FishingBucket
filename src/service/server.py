@@ -89,9 +89,12 @@ class Discord(Server[discord.Bot]):
 ALL_SERVERS = [Fluxer, Discord]
 
 SERVER_INSTANCES: list[Server] = []
+PLATFORM_TO_SERVER: dict[Platform, Server] = {}
 
 def setup_instances() -> list[Server]:
     for server in ALL_SERVERS:
-        SERVER_INSTANCES.append(server())
+        s = server()
+        SERVER_INSTANCES.append(s)
+        PLATFORM_TO_SERVER[s.platform] = s
 
     return SERVER_INSTANCES

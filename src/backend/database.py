@@ -728,6 +728,17 @@ class Database:
         ):
             Cache.user_id.invalidate((sso_id, platform))
 
+    async def get_accounts(self, uid: int) -> list[tuple[int, Platform]]:
+        async with self.connection.execute(
+            "SELECT user_id, account_type FROM accounts WHERE owner = ?",
+                (uid, )
+        ) as cursor:
+            accounts = []
+            for row in await cursor.fetchall():
+                accounts.append((row[0], Platform.from_(row[1])))
+            return accounts
+
+
     async def get_autoproxy_preference(self, user_id: int, guild: Guild) -> UserAutoproxyPreference | None:
         if (ref := Cache.autoproxy_preferences.get((user_id, guild), 0)) is not 0:
             if ref and ref.expires_now():
@@ -1358,5 +1369,7 @@ class Database:
         DELETE FROM autoproxies WHERE user_id = ?
         """, (user, )):
             pass
+
+        Cache.user_id.clear(lambda k, v: v == user)
 
         await self.delete_data(user)

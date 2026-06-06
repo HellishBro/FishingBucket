@@ -65,7 +65,7 @@ class User(c.User):
 
     async def get_dm(self) -> Channel | None:
         try:
-            return await self.raw.create_dm()
+            return Channel(await self.raw.create_dm(), self.bot)
         except fluxer.HTTPException:
             return None
 
@@ -509,6 +509,12 @@ class Bot(c.Bot):
     @property
     def user(self) -> User:
         return User(self.raw.user, self.bot)
+
+    async def get_user(self, user_id: int) -> User | None:
+        try:
+            return User(await self.bot.fetch_user(str(user_id)), self.bot)
+        except fluxer.NotFound:
+            return None
 
     @property
     def guilds(self) -> list[Guild]:

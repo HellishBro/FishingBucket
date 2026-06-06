@@ -202,7 +202,7 @@ async def on_user_message(context: Context):
     if context.channel.dm:
         return
 
-    owner = await get_uid(context)
+    owner = await get_uid(context, on_unregistered=...)
     guild = Guild(context.guild.id, context.platform)
 
     roles = await (await context.get_member(context.author.id)).roles()
