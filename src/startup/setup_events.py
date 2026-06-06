@@ -30,7 +30,10 @@ async def message_wrapper(context: Context):
 
 
 async def handle_message(context: Context):
-    if (context.author.id, context.platform) in editing_proxy_messages:
+    channel = await context.get_channel(context.message.channel_id)
+
+    if channel.dm and (context.author.id, context.platform) in editing_proxy_messages:
+        editing_proxy_messages.pop((context.author.id, context.platform))
         msg = editing_proxy_messages[context.author.id, context.platform]
         lnk = await Database.instance.get_message_link(msg.id, msg.channel_id)
         uid = await Database.instance.get_user_id(context.author.id, context.platform, False)
