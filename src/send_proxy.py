@@ -62,7 +62,9 @@ async def get_proxied_messages(message: str, user_id: int, autoproxy_preferences
 async def get_webhook(context: Context) -> Webhook:
     webhook = None
 
+    print(context.message.channel_id)
     if webhook_id := await Database.instance.get_channel_webhook(context.message.channel_id, context.platform):
+        print(webhook_id, context.message.channel_id)
         webhook = await context.get_bot.get_webhook(webhook_id)
 
     if webhook is None:
