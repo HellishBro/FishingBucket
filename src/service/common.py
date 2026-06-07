@@ -393,6 +393,9 @@ class Context(ABC):
     @abstractmethod
     async def get_channel(self, channel_id: int) -> Channel | None: pass
 
+    @abstractmethod
+    async def get_this_channel(self) -> Channel: pass
+
     @property
     @abstractmethod
     def get_bot(self) -> Bot: pass

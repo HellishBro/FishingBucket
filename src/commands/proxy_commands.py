@@ -52,6 +52,7 @@ def setup():
 
     @hook_command("list")
     async def _(context: Context, page: int, detailed: bool):
+        channel = await context.get_this_channel()
         uid = await get_uid(context)
 
         await paged_proxy_list(
@@ -59,12 +60,13 @@ def setup():
             await Database.instance.get_user_proxies(uid),
             f"Registered Proxies of {context.author.display_name}",
             page,
-            context.channel.dm or detailed
+            channel.dm or detailed
         )
 
 
     @hook_command("find")
     async def _(context: Context, name: str):
+        channel = await context.get_this_channel()
         owner = await get_uid(context)
 
         norm_name = normalize_emojis(name)
@@ -103,7 +105,7 @@ def setup():
             [user_proxies[i] for i in sorted_distances if sorted_distances[i] <= 5],
             f"Proxy Search: **{name}**",
             0,
-            context.channel.dm,
+            channel.dm,
             additional_embeds,
             False
         )
@@ -111,9 +113,10 @@ def setup():
 
     @hook_command("info")
     async def _(context: Context, proxy: Proxy, detailed: bool = False):
+        channel = await context.get_this_channel()
         uid = await get_uid(context)
 
-        detailed = context.channel.dm or detailed
+        detailed = channel.dm or detailed
 
         await context.reply("", [Embed(
             proxy.name,

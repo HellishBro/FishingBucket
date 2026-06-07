@@ -35,6 +35,7 @@ def setup():
 
     @hook_command("group list")
     async def _(context: Context, page: int, detailed: bool):
+        channel = await context.get_this_channel()
         uid = await get_uid(context)
 
         await paged_proxy_group_list(
@@ -42,21 +43,23 @@ def setup():
             await Database.instance.get_user_groups(uid),
             f"Proxy Groups of {context.author.display_name}",
             page,
-            context.channel.dm or detailed
+            channel.dm or detailed
         )
 
 
     @hook_command("group info")
     async def _(context: Context, group: ProxyGroup, detailed: bool):
+        channel = await context.get_this_channel()
         embed = Embed(
             f"{group.name}",
-            get_groups_text([group], await Database.instance.get_user_preferences(await get_uid(context)), context.channel.dm or detailed)[0]
+            get_groups_text([group], await Database.instance.get_user_preferences(await get_uid(context)), channel.dm or detailed)[0]
         )
         await context.reply("", [embed])
 
 
     @hook_command("group members")
     async def _(context: Context, group: ProxyGroup, page: int, detailed: bool):
+        channel = await context.get_this_channel()
         uid = await get_uid(context)
         proxies = await Database.instance.get_user_proxies(uid)
         filtered = [proxy for proxy in proxies if proxy.group and proxy.group.id == group.id]
@@ -66,7 +69,7 @@ def setup():
             filtered,
             f"Proxies of {context.author.display_name} in **{group.name}**",
             page,
-            context.channel.dm or detailed
+            channel.dm or detailed
         )
 
 

@@ -622,6 +622,9 @@ class Context(c.Context):
         except fluxer.NotFound:
             return None
 
+    async def get_this_channel(self) -> Channel:
+        return await self.get_channel(self.message.channel_id)
+
     @property
     def get_bot(self) -> Bot:
         return Bot(self.bot, self.bot)

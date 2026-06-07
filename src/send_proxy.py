@@ -203,7 +203,9 @@ async def edit_proxy_message(old_message: Context, new_message_contents: str, me
 
 
 async def on_user_message(context: Context):
-    if context.channel.dm:
+    channel = await context.get_this_channel()
+
+    if channel.dm:
         return
 
     owner = await get_uid(context, on_unregistered=...)
@@ -212,7 +214,7 @@ async def on_user_message(context: Context):
     roles = await (await context.get_member(context.author.id)).roles()
 
     if await Database.instance.get_allow_proxy(
-            context.channel.id,
+            channel.id,
             guild,
             [role.id for role in roles][::-1],
             context.author.id
