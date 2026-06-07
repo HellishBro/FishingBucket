@@ -1,8 +1,8 @@
 import asyncio
 import signal
-import threading
 import traceback
 import time
+import os
 
 from .backend.config import Config
 from .backend.data_reader import DataReader
@@ -54,7 +54,7 @@ def run(config_file: str):
     signal.signal(signal.SIGTERM, lambda s, f: shutdown(f"SIGTERM reached {s}; {f}", f))
 
     attempts = 0
-    while True:
+    while do_run:
         print("Trying to connect...")
         start_time = time.time()
         err = None
@@ -75,6 +75,7 @@ def run(config_file: str):
             print("".join(traceback.format_exception(type(be), be, be.__traceback__)))
             err = be
 
+        print("Trying to restart")
         if not do_run:
             break
 
@@ -98,4 +99,4 @@ def run(config_file: str):
         print("Retrying connect...")
 
     print("Shutting down")
-    quit()
+    os._exit(1)
