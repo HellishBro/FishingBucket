@@ -50,6 +50,7 @@ def run(config_file: str):
 
         print("Shutting down:", reason)
         do_run = False
+        raise Exception()
 
     signal.signal(signal.SIGTERM, lambda s, f: shutdown(f"SIGTERM reached {s}; {f}", f))
 
@@ -59,21 +60,23 @@ def run(config_file: str):
         start_time = time.time()
         err = None
         try:
-            asyncio.run(Database.instance.init())
+            try:
+                asyncio.run(Database.instance.init())
 
-            for server in servers:
-                setup_events.setup(server)
+                for server in servers:
+                    setup_events.setup(server)
 
-            api_app.set_context(ApplicationContext(Database.instance, Config.instance))
-            asyncio.run(run_once())
-        except (SystemExit, KeyboardInterrupt) as e:
-            shutdown(repr(e))
-        except Exception as e:
-            print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
-            err = e
-        except BaseException as be:
-            print("".join(traceback.format_exception(type(be), be, be.__traceback__)))
-            err = be
+                api_app.set_context(ApplicationContext(Database.instance, Config.instance))
+                asyncio.run(run_once())
+            except (SystemExit, KeyboardInterrupt) as e:
+                shutdown(repr(e))
+            except Exception as e:
+                print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
+                err = e
+            except BaseException as be:
+                print("".join(traceback.format_exception(type(be), be, be.__traceback__)))
+                err = be
+        except Exception: pass
 
         print("Trying to restart")
         if not do_run:
