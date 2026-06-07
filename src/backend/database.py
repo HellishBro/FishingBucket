@@ -1307,6 +1307,7 @@ class Database:
             return groups
 
     async def close(self):
+        print("Closing database connection.")
         await self.connection.close()
 
     async def delete_data(self, owner: int):

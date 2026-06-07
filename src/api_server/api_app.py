@@ -54,3 +54,4 @@ class Application:
             self.server.should_exit = True
             await self.server.shutdown()
         self.ready = False
+        print("API server shutdown.")

@@ -93,13 +93,15 @@ class Fluxer(Server[fluxer.Bot]):
         self.bot = fluxer.Bot(intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
         for event in self.events:
             self.bot.event(event)
-        if Config.instance.use_extras and self.tip_loop_task is None or self.tip_loop_task.done():
+        if Config.instance.use_extras and (self.tip_loop_task is None or self.tip_loop_task.done()):
             self.tip_loop_task = asyncio.create_task(self.tip_loop(self.tip_loop_inner))
 
+        print("Start Fluxer bot")
         await self.bot.start(Config.instance.token)
 
 
     async def close(self):
+        print("End Fluxer bot")
         await self.bot.close()
 
         if self.tip_loop_task is not None and not self.tip_loop_task.done():
@@ -109,6 +111,8 @@ class Fluxer(Server[fluxer.Bot]):
                 await self.tip_loop_task
 
             self.tip_loop_task = None
+
+        print("Fluxer bot finished")
 
 
     def event(self, function: Coro):
@@ -137,13 +141,15 @@ class Discord(Server[discord.Bot]):
         for event in self.events:
             self.bot.event(event)
 
-        if Config.instance.use_extras and self.tip_loop_task is None or self.tip_loop_task.done():
+        if Config.instance.use_extras and (self.tip_loop_task is None or self.tip_loop_task.done()):
             self.tip_loop_task = asyncio.create_task(self.tip_loop(self.tip_loop_inner))
 
+        print("Start Discord bot")
         await self.bot.start(Config.instance.discord.token)
 
 
     async def close(self):
+        print("End Discord bot")
         await self.bot.close()
 
         if self.tip_loop_task is not None and not self.tip_loop_task.done():
@@ -153,6 +159,8 @@ class Discord(Server[discord.Bot]):
                 await self.tip_loop_task
 
             self.tip_loop_task = None
+
+        print("Discord bot finished")
 
     def event(self, function: Coro):
         self.events.append(function)

@@ -1,4 +1,6 @@
 import asyncio
+import signal
+import threading
 import traceback
 import time
 
@@ -25,9 +27,11 @@ def run(config_file: str):
     servers = setup_instances()
     Interactions()
 
+    do_run = True
+
     async def run_once():
         starts = [asyncio.Future()] + [server.start() for server in servers]
-        ends = [server.close() for server in servers]
+        ends = [Database.instance.close()] + [server.close() for server in servers]
         if Config.instance.api_server.enabled:
             starts.append(api_app.serve())
             ends.append(api_app.close())
@@ -36,6 +40,18 @@ def run(config_file: str):
             await asyncio.gather(*starts)
         finally:
             await asyncio.gather(*ends)
+            print("Finished ending everything")
+
+    def shutdown(reason: str, frame = None):
+        nonlocal do_run
+        if frame:
+            import traceback
+            traceback.print_stack(frame)
+
+        print("Shutting down:", reason)
+        do_run = False
+
+    signal.signal(signal.SIGTERM, lambda s, f: shutdown(f"SIGTERM reached {s}; {f}", f))
 
     attempts = 0
     while True:
@@ -50,14 +66,17 @@ def run(config_file: str):
 
             api_app.set_context(ApplicationContext(Database.instance, Config.instance))
             asyncio.run(run_once())
-        except KeyboardInterrupt:
-            quit()
+        except (SystemExit, KeyboardInterrupt) as e:
+            shutdown(repr(e))
         except Exception as e:
             print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
             err = e
         except BaseException as be:
             print("".join(traceback.format_exception(type(be), be, be.__traceback__)))
             err = be
+
+        if not do_run:
+            break
 
         readied = any(server.ready for server in servers)
         if not readied:
@@ -68,7 +87,6 @@ def run(config_file: str):
         session_time = time.time() - start_time
         wait_sec = 10 + 10 * min(attempts, 30)
         print(f"Resetting... error: {err}. Session time: {session_time:.2f}s, readied? {readied}. Connection attempt {attempts}. Waiting for {wait_sec} seconds.")
-        asyncio.run(Database.instance.close())
 
         for server in servers:
             server.clear_events()
@@ -78,3 +96,6 @@ def run(config_file: str):
 
         time.sleep(wait_sec)
         print("Retrying connect...")
+
+    print("Shutting down")
+    quit()
