@@ -136,7 +136,7 @@ class TemplateStrategy(Strategy):
         string = await StringStrategy().parse(stream, argument, context)
         if "text" in string and not ("{" in string and "}" in string):
             string = string.replace("text", "{}", 1)
-            await context.reply(f"Note: {Config.instance.name} uses `{'{}'}` for placeholders instead of `text`. Your input has been auto-coerced to use `{'{}'}`.")
+            await context.reply(f"Note: {Config.name()} uses `{'{}'}` for placeholders instead of `text`. Your input has been auto-coerced to use `{'{}'}`.")
 
         template = Template.from_string(string)
         if template.errors:

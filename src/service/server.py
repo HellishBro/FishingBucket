@@ -11,9 +11,9 @@ from fluxer import gateway as fluxer_gateway
 from .common import Bot as BotT
 from .discord import Bot as DiscordBot
 from .fluxer import Bot as FluxerBot
-from .enums import Platform
 from ..backend.config import Config
 from ..backend.data_reader import DataReader
+from ..backend.models import Platform
 from ..backend.template_utils import Template
 
 type Coro = Callable[..., Coroutine[Any, Any, Any]]
@@ -90,14 +90,14 @@ class Fluxer(Server[fluxer.Bot]):
         self.tip_loop_task: asyncio.Task | None = None
 
     async def start(self):
-        self.bot = fluxer.Bot(intents=fluxer.Intents.default(), api_url=Config.instance.api_url)
+        self.bot = fluxer.Bot(intents=fluxer.Intents.default(), api_url=Config.cfg(Platform.Fluxer).api_url.unicode_string())
         for event in self.events:
             self.bot.event(event)
         if Config.instance.use_extras and (self.tip_loop_task is None or self.tip_loop_task.done()):
             self.tip_loop_task = asyncio.create_task(self.tip_loop(self.tip_loop_inner))
 
         print("Start Fluxer bot")
-        await self.bot.start(Config.instance.token)
+        await self.bot.start(Config.cfg(Platform.Fluxer).token)
 
 
     async def close(self):
@@ -137,7 +137,9 @@ class Discord(Server[discord.Bot]):
         self.tip_loop_task: asyncio.Task | None = None
 
     async def start(self):
-        self.bot = discord.Bot(intents=discord.Intents.all())
+        intents = discord.Intents.default()
+        intents.message_content = True
+        self.bot = discord.Bot(intents=intents)
         for event in self.events:
             self.bot.event(event)
 
@@ -145,7 +147,7 @@ class Discord(Server[discord.Bot]):
             self.tip_loop_task = asyncio.create_task(self.tip_loop(self.tip_loop_inner))
 
         print("Start Discord bot")
-        await self.bot.start(Config.instance.discord.token)
+        await self.bot.start(Config.cfg(Platform.Discord).token)
 
 
     async def close(self):
@@ -179,8 +181,9 @@ PLATFORM_TO_SERVER: dict[Platform, Server] = {}
 
 def setup_instances() -> list[Server]:
     for server in ALL_SERVERS:
-        s = server()
-        SERVER_INSTANCES.append(s)
-        PLATFORM_TO_SERVER[s.platform] = s
+        if Config.cfg(server.platform):
+            s = server()
+            SERVER_INSTANCES.append(s)
+            PLATFORM_TO_SERVER[s.platform] = s
 
     return SERVER_INSTANCES

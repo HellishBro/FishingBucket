@@ -5,9 +5,10 @@ import discord
 import fluxer
 
 from ..backend.database import Database
+from ..backend.models import Platform
 from ..interaction import Interactions
 from ..send_proxy import on_user_message, edit_proxy_message
-from ..service import Context, Platform, Server, FluxerServer, DiscordServer, FluxerContext, DiscordContext, \
+from ..service import Context, Server, FluxerServer, DiscordServer, FluxerContext, DiscordContext, \
     ReactionActionEvent, Embed, Message
 from ..service.fluxer import Message as FluxerMessage, ReactionActionEvent as FluxerReactionActionEvent
 from ..service.discord import Message as DiscordMessage, ReactionActionEvent as DiscordReactionActionEvent
@@ -46,7 +47,7 @@ async def handle_message(context: Context):
             await cmd
             return
     except ParseError as e:
-        await context.reply(f"Error parsing command: {e.message}.\nUse `{Config.instance.prefixes[0]}help` to see command shape.")
+        await context.reply(f"Error parsing command: {e.message}.\nUse `{Config.prefix()}help` to see command shape.")
         return
     except EarlyExitException:
         return

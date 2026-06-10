@@ -1,98 +1,96 @@
 import json
-from dataclasses import dataclass
 
-@dataclass
-class ApiServer:
+from pydantic import BaseModel, FilePath, HttpUrl
+
+from .models import Platform
+
+
+class ApiServerPlatformConfig(BaseModel):
+    client_id: int
+    client_secret: str
+
+class ApiServer(BaseModel):
     enabled: bool
     domain: str
     port: int
-    client_secret: str
+    database: FilePath
+    fluxer: ApiServerPlatformConfig
+    discord: ApiServerPlatformConfig | None = None
+
+    def cfg(self, item: Platform) -> ApiServerPlatformConfig | None:
+        if item is Platform.Fluxer:
+            return self.fluxer
+        elif item is Platform.Discord:
+            return self.discord
+        return None
+
+
+class WebsiteConfig(BaseModel):
+    dashboard: HttpUrl
+    home: HttpUrl
+    terms: HttpUrl
+    privacy: HttpUrl
+    contact: HttpUrl
+
+
+class PlatformConfig(BaseModel):
+    token: str
+    guild_invite: str
+    guild_id: int
+    bot_invite: str
     client_id: int
-    url: str
-    database: str
-
-@dataclass
-class WebsiteConfig:
-    dashboard: str
-    home: str
-    terms: str
-    privacy: str
-    contact: str
-
-@dataclass
-class DiscordConfig:
-    token: str
-    server_invite: str
-    server_id: int
-    bot_invite: str
+    api_url: HttpUrl
 
 
-class Config:
-    instance: Config
+class Config_(BaseModel):
+    fluxer: PlatformConfig
+    discord: PlatformConfig | None = None
 
-    token: str
-    devs: list[int]
     name: str
-    server_invite: str
-    server_id: int
-    bot_invite: str
     prefixes: list[str]
     database_file: str
-    api_url: str
     data_path: str
     webhook: str
 
-    use_extras: bool
-    donation: str
-    user_token: str | None
-    bot_client_id: int | None
-    bot_bios: dict[str, str] | None
-    api_server: ApiServer | None
-    website: WebsiteConfig | None
-    discord: DiscordConfig | None
+    use_extras: bool = False
+    donation: HttpUrl | None = None
+    api_server: ApiServer | None = None
+    website: WebsiteConfig | None = None
 
-    _fields_map = {
-        "token": "token",
-        "devs": "devs",
-        "name": "name",
-        "hq_server_invite": "server_invite",
-        "hq_server_id": "server_id",
-        "bot_invite_link": "bot_invite",
-        "prefixes": "prefixes",
-        "database": "database_file",
-        "api": "api_url",
-        "data": "data_path",
-        "webhook": "webhook",
-        "use_extras": "use_extras",
-        "?donation": "donation",
-        "?user_token": "user_token",
-        "?client_id": "bot_client_id",
-        "?bio": "bot_bios",
-        "?api_server": "api_server",
-        "?website": "website",
-        "?discord": "discord"
-    }
+    def cfg(self, item: Platform) -> PlatformConfig | None:
+        if item is Platform.Fluxer:
+            return self.fluxer
+        elif item is Platform.Discord:
+            return self.discord
+        return None
+
+    def prefix(self) -> str:
+        return self.instance.prefixes[0]
+
+    def name(self) -> str:
+        return self.instance.name
+
+
+class Config:
+    instance: Config_
 
     def __init__(self, filename: str = "config.json"):
         with open(filename) as f:
             conf = json.loads(f.read())
-            for k, v in self._fields_map.items():
-                optional = False
-                if k.startswith("?"):
-                    k = k[1:]
-                    optional = True
-                if k in conf:
-                    if k == "api_server":
-                        setattr(self, v, ApiServer(**conf[k]))
-                    elif k == "website":
-                        setattr(self, v, WebsiteConfig(**conf[k]))
-                    elif k == "discord":
-                        setattr(self, v, DiscordConfig(**conf[k]))
-                    else:
-                        setattr(self, v, conf[k])
-                elif not optional:
-                    raise KeyError(f"Cannot find key {k!r} in config.json!")
-                else:
-                    setattr(self, v, None)
+            Config.instance = Config_(**conf)
 
-        Config.instance = self
+    @classmethod
+    def cfg(cls, item: Platform) -> PlatformConfig | None:
+        if item is Platform.Fluxer:
+            return cls.instance.fluxer
+        elif item is Platform.Discord:
+            return cls.instance.discord
+        return None
+
+    @classmethod
+    def prefix(cls) -> str:
+        return cls.instance.prefixes[0]
+
+    @classmethod
+    def name(cls) -> str:
+        return cls.instance.name

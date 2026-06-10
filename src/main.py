@@ -32,7 +32,7 @@ def run(config_file: str):
     async def run_once():
         starts = [asyncio.Future()] + [server.start() for server in servers]
         ends = [Database.instance.close()] + [server.close() for server in servers]
-        if Config.instance.api_server.enabled:
+        if Config.instance.api_server:
             starts.append(api_app.serve())
             ends.append(api_app.close())
 

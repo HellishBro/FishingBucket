@@ -1,8 +1,7 @@
 import random
 from dataclasses import dataclass
 import json
-
-from .template_utils import Template
+from enum import Enum, auto
 
 
 class ID(int):
@@ -62,6 +61,7 @@ class Proxy:
 
     @property
     def effective_name(self) -> str:
+        from .template_utils import Template # i've sinned
         n = self.nickname or self.name
         this_group = self.group
         while this_group:
@@ -94,3 +94,18 @@ class Proxy:
     @property
     def effective_avatar(self) -> str:
         return self.forms.get(self.current_form, self.avatar_url)
+
+
+class Platform(Enum):
+    Fluxer = auto()
+    Discord = auto()
+
+    def get(self) -> int:
+        if self == Platform.Fluxer:
+            return 0
+        else:
+            return 1
+
+    @classmethod
+    def from_(cls, id_: int) -> Platform:
+        return [Platform.Fluxer, Platform.Discord][id_]

@@ -5,8 +5,8 @@
   "Feature announcements and polls are in the support community!",
   "Tips refresh every 5 minutes!",
   "Group your proxies together by using `{prefix}group add`!",
-  "Rome wasn't made in a day but {config.name} is* (not really).",
+  "Rome wasn't made in a day but {name} is* (not really).",
   "Use something like `\\{\\{1 + 2\\}\\}` in proxied messages to do quick calculations or dice!",
-  "Follow {config.name}'s development in the support community!",
+  "Follow {name}'s development in the support community!",
   "Come join us on other platforms!"
 ]

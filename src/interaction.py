@@ -3,7 +3,8 @@ from asyncio import sleep
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .service import Platform, Context
+    from .service import Context
+    from .backend.models import Platform
 
 
 class Interaction:

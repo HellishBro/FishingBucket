@@ -4,12 +4,13 @@ from typing import Literal
 
 from lorem_text import lorem
 
-from .generic import hook_command, get_command_invocation
+from .generic import hook_command
 from .specific import get_uid
 from ..backend.config import Config
 from ..backend.database import Database
+from ..backend.models import Platform
 from ..interaction import Interactions, Interaction
-from ..service import Context, Embed, ReactionActionEvent, Platform
+from ..service import Context, Embed, ReactionActionEvent
 from ..service.server import PLATFORM_TO_SERVER
 
 account_links: dict[str, tuple[int, tuple[int, Platform], float, str]] = {} # link code => (uid, (user_id, platform), timestamp, name)
@@ -91,7 +92,7 @@ def setup():
         account_links[new_code] = uid, key, now, "@" + context.author.full_tag
 
         await channel.send(f"Execute this entire command from the account that you want to link from to complete the process!")
-        await channel.send(f"{Config.instance.prefixes[0]}link code {new_code}")
+        await channel.send(f"{Config.prefix()}link code {new_code}")
 
         this_channel = await context.get_channel(context.message.channel_id)
         if not this_channel.dm:

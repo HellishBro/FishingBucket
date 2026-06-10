@@ -176,3 +176,4 @@ class ModifiedItemResponse(BaseModel):
 class LoginInformation(BaseModel):
     session_id: str
     user: dict
+    platform: Literal["discord"] | Literal["fluxer"]

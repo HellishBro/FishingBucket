@@ -8,7 +8,7 @@ from .api_app import Application, require_session
 from .api_database import Session, Database
 from .batch_edit import handle_batch_edit
 from .models import Proxy, ProxyGroup, ModifiedItemResponse, BatchEdit, LoginInformation
-from ..service import Platform
+from ..backend.models import Platform
 
 app = Application()
 router = app.create_router("/api/v1")
@@ -44,11 +44,15 @@ async def _(edits: BatchEdit, session: Session = Depends(require_session)) -> Mo
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-@router.get("/auth", status_code=307)
+@router.get("/auth/discord", status_code=307)
 async def _(redirect_uri: str) -> RedirectResponse:
-    return RedirectResponse(f"https://web.fluxer.app/oauth2/authorize?client_id={app.context.config.api_server.client_id}&scope=identify&redirect_uri={redirect_uri}")
+    return RedirectResponse(f"https://discord.com/oauth2/authorize?client_id={app.context.config.api_server.discord.client_id}&response_type=code&redirect_uri={redirect_uri}&scope=identify")
 
-@router.post("/auth/login", response_model=LoginInformation)
+@router.get("/auth/fluxer", status_code=307)
+async def _(redirect_uri: str) -> RedirectResponse:
+    return RedirectResponse(f"https://web.fluxer.app/oauth2/authorize?client_id={app.context.config.api_server.fluxer.client_id}&scope=identify&redirect_uri={redirect_uri}")
+
+@router.post("/auth/fluxer/login", response_model=LoginInformation)
 async def _(request: Request) -> LoginInformation:
     req = await request.json()
     async with aiohttp.ClientSession() as session:
@@ -56,19 +60,48 @@ async def _(request: Request) -> LoginInformation:
             "grant_type": "authorization_code",
             "code": req.get("code"),
             "redirect_uri": req.get("redirect_uri"),
-            "client_id": app.context.config.api_server.client_id,
-            "client_secret": app.context.config.api_server.client_secret
+            "client_id": app.context.config.api_server.fluxer.client_id,
+            "client_secret": app.context.config.api_server.fluxer.client_secret
         }
         form_data = aiohttp.FormData(payload)
-        async with session.post(f"{app.context.config.api_url}/oauth2/token", data=form_data) as resp:
+        async with session.post(f"{app.context.config.fluxer.api_url}/oauth2/token", data=form_data) as resp:
             data = await resp.json()
             access_token = data["access_token"]
-            async with session.get(f"{app.context.config.api_url}/users/@me", headers={"Authorization": "Bearer " + access_token}) as resp_user:
+            async with session.get(f"{app.context.config.fluxer.api_url}/users/@me", headers={"Authorization": "Bearer " + access_token}) as resp_user:
                 obj = await resp_user.json()
                 user_id = int(obj["id"])
-                native_id = await app.context.database.get_user_id(user_id, Platform.Fluxer)
-                session_id = await Database.instance.new_session(native_id, obj)
-                return LoginInformation(session_id=session_id, user=obj)
+                native_id = await app.context.database.get_user_id(user_id, Platform.Fluxer, False)
+                if native_id != -1:
+                    session_id = await Database.instance.new_session(native_id, obj, Platform.Fluxer)
+                    return LoginInformation(session_id=session_id, user=obj, platform="fluxer")
+                raise HTTPException(403, "You do not have an account!")
+
+@router.post("/auth/discord/login", response_model=LoginInformation)
+async def _(request: Request) -> LoginInformation:
+    req = await request.json()
+    async with aiohttp.ClientSession() as session:
+        payload = {
+            "grant_type": "authorization_code",
+            "code": req.get("code"),
+            "redirect_uri": req.get("redirect_uri"),
+            "client_id": app.context.config.api_server.discord.client_id,
+            "client_secret": app.context.config.api_server.discord.client_secret
+        }
+        async with session.post(
+                f"{app.context.config.discord.api_url}/oauth2/token",
+                data=payload,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+        ) as resp:
+            data = await resp.json()
+            access_token = data["access_token"]
+            async with session.get(f"{app.context.config.discord.api_url}/users/@me", headers={"Authorization": "Bearer " + access_token}) as resp_user:
+                obj = await resp_user.json()
+                user_id = int(obj["id"])
+                native_id = await app.context.database.get_user_id(user_id, Platform.Discord, False)
+                if native_id != -1:
+                    session_id = await Database.instance.new_session(native_id, obj, Platform.Discord)
+                    return LoginInformation(session_id=session_id, user=obj, platform="discord")
+                raise HTTPException(403, "You do not have an account!")
 
 
 @router.post("/auth/logout", status_code=204)

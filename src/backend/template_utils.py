@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 import re
 
+from pydantic import BaseModel
+
 from .cache import TTLCache
 from .config import Config
 
@@ -201,6 +203,8 @@ class Template:
                 parsed[k] = v
             elif v is None:
                 parsed[k] = v
+            elif isinstance(v, BaseModel):
+                parsed[k] = celpy.json_to_cel(v.model_dump(mode="json"))
             else:
                 parsed[k] = celpy.json_to_cel(self.make_value({k_: v_ for k_, v_ in v.__dict__.items() if not (k_.startswith("_") or k_.endswith("_"))}))
         return parsed
@@ -230,6 +234,8 @@ class Template:
     def get_default_metatext_variables(context: Context) -> dict:
         return {
             "config": Config.instance,
+            "prefix": Config.prefix(),
+            "name": Config.name(),
             "context": {
                 "platform": context.platform.name
             }

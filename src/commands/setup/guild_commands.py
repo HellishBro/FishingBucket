@@ -8,7 +8,7 @@ def setup():
     guild_group = make_command_group(
         "guild_commands",
         "Community Commands",
-        f"Commands that changes how {Config.instance.name} functions in your community."
+        f"Commands that changes how {Config.name()} functions in your community."
     )
 
     guild_group.append(

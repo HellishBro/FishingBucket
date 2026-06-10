@@ -12,7 +12,7 @@ from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
 from .backend.utils import convert_attachments, normalize_emojis, roll_dice
 from .commands.specific import get_uid
-from .service import Platform, Context, Webhook, Attachment, Embed, Channel, Message
+from .service import Context, Webhook, Attachment, Embed, Channel
 
 
 def message_matches_trigger(message: str, triggers: list[str]) -> tuple[bool, str]:

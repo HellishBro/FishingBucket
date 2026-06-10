@@ -44,8 +44,8 @@ class Application:
             self.app.include_router(r)
 
         host, port = config.api_server.domain, config.api_server.port
-        config = uvicorn.Config(self.app, host, port, reload=False)
-        self.server = uvicorn.Server(config)
+        uv_conf = uvicorn.Config(self.app, host, port, reload=False)
+        self.server = uvicorn.Server(uv_conf)
         await self.server.serve()
         print(f"API server is running at {host}:{port}!")
 

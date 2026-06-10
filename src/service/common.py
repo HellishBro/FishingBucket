@@ -3,7 +3,7 @@ from abc import abstractmethod, ABC
 from datetime import datetime
 from typing import Any, Literal
 
-from .enums import Platform
+from ..backend.models import Platform
 
 
 class Embed:

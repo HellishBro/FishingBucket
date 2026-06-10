@@ -4,7 +4,8 @@ from typing import Callable, Coroutine, Any
 from .data import Command, Argument, CharacterStream, ParsingArgument, ParseError, CommandGroup
 from .strategies import strategize
 from ...backend.config import Config
-from ...service import Context, Platform
+from ...backend.models import Platform
+from ...service import Context
 
 
 class EarlyExitException(Exception): pass
@@ -56,7 +57,7 @@ def make_command_group(
 
 
 def get_command_invocation(command: str) -> str:
-    return f"{Config.instance.prefixes[0]}{command_registry[command].get_usage(strategize)}"
+    return f"{Config.prefix()}{command_registry[command].get_usage(strategize)}"
 
 
 def get_commands() -> dict[str, Command]:

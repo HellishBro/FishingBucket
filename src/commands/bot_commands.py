@@ -9,7 +9,8 @@ from ..backend.config import Config
 from ..backend.data_reader import DataReader
 from ..backend.database import Database
 from ..backend.template_utils import Template
-from ..service import Platform, Context, Embed, Channel
+from ..backend.models import Platform
+from ..service import Context, Embed
 
 
 def setup():
@@ -27,10 +28,7 @@ def setup():
     @hook_command("invite")
     async def _(context: Context):
         def get_invites(plat: Platform) -> tuple[str, str]:
-            return (
-                Config.instance.bot_invite if plat == Platform.Fluxer else Config.instance.discord.bot_invite,
-                Config.instance.server_invite if plat == Platform.Fluxer else Config.instance.discord.server_invite
-            )
+            return Config.cfg(plat).bot_invite, Config.cfg(plat).guild_invite
 
         bot_invite, server_invite = get_invites(context.platform)
         description = f"Use [this link]({bot_invite}) to invite me to your community!\nSupport community invite: {server_invite}."
@@ -84,7 +82,7 @@ def setup():
         commands = get_commands()
         if topic in commands:
             command = commands[topic]
-            description = f"**Usage**: `{Config.instance.prefixes[0]}{command.get_usage(strategize)}`\n\n{get_description(command)}\n\n**Examples**:"
+            description = f"**Usage**: `{Config.prefix()}{command.get_usage(strategize)}`\n\n{get_description(command)}\n\n**Examples**:"
             examples = []
             for _ in range(10):
                 example = command.get_example_invocation()
@@ -95,9 +93,9 @@ def setup():
                     break
 
             for example in sorted(examples, key=len):
-                description += f"\n- `{Config.instance.prefixes[0]}{example}`"
+                description += f"\n- `{Config.prefix()}{example}`"
 
-            await context.reply("", [Embed(f"Help: {Config.instance.prefixes[0]}{topic}", description)])
+            await context.reply("", [Embed(f"Help: {Config.prefix()}{topic}", description)])
             return
 
         groups = get_command_groups()
@@ -106,7 +104,7 @@ def setup():
             description = f"**{group.brief}** (`{group.canonical_name}`): {group.description}\n"
             for cmd_id in group.commands:
                 cmd = get_commands()[cmd_id]
-                description += f"\n- `{Config.instance.prefixes[0]}{cmd.get_usage(strategize)}` - {cmd.brief}"
+                description += f"\n- `{Config.prefix()}{cmd.get_usage(strategize)}` - {cmd.brief}"
 
             await context.reply("", [Embed(f"Help: {group.brief}", description)])
             return
@@ -146,14 +144,14 @@ def setup():
             if stat in all_stats:
                 m = mapping.get(stat, (stat, lambda n: str(n)))
                 await context.reply("", embeds=[Embed(
-                    f"{Config.instance.name} Statistics",
+                    f"{Config.name()} Statistics",
                     f"**{m[0]}** (`{stat}`): {m[1](all_stats[stat])}"
                 )])
             else:
                 await context.reply(f"Error! `{stat}` is not recognized as a tracked statistic!")
         else:
             await context.reply("", embeds=[Embed(
-                f"{Config.instance.name} Statistics",
+                f"{Config.name()} Statistics",
                 "\n".join(f"**{(m := mapping.get(stat, (stat, lambda n: str(n))))[0]}** (`{stat}`): {m[1](all_stats[stat])}" for stat in all_stats)
             )])
 

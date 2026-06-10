@@ -10,7 +10,7 @@ from aiohttp import ClientSession
 
 from . import common as c
 from .common import Embed, File
-from .enums import Platform
+from ..backend.models import Platform
 from ..interaction import Interactions, Interaction
 
 

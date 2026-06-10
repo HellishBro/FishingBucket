@@ -6,8 +6,7 @@ from collections import namedtuple
 from dataclasses import dataclass
 
 from .cache import TTLCache
-from .models import Proxy, ProxyGroup, ID
-from ..service import Platform
+from .models import Proxy, ProxyGroup, ID, Platform
 
 lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner", "times_used", "creation_date", "proxy_group", "nickname", "proxy_forms", "current_form"]
 proxy_fields = ", ".join(lst_proxy_fields)
