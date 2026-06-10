@@ -488,7 +488,7 @@ class Webhook(c.Webhook):
     async def get_message_data(self, context: Context) -> Message:
         actual_contents = context.content
         if context.message.has_reference:
-            actual_contents = context.content.split("\n", maxsplit=1)[1]
+            actual_contents = context.content.split("\n", maxsplit=2)[1]
 
         class M(Message):
             @property

@@ -369,7 +369,7 @@ class Webhook(c.Webhook):
             message_id = match.group(1)
             message_id = int(message_id)
             referenced_message = await context.channel.get_message(message_id)
-            actual_contents = context.content.split("\n", maxsplit=1)[1]
+            actual_contents = context.content.split("\n", maxsplit=2)[1]
 
         class M(Message):
             @property

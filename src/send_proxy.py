@@ -77,6 +77,7 @@ async def get_webhook(context: Context) -> Webhook:
 
 async def send_proxy_message(proxy: Proxy, message: str, context: Context, attachments: list[Attachment], mention: bool, do_reply: bool) -> Context:
     webhook: Webhook = await get_webhook(context)
+    channel = await context.get_this_channel()
 
     mention_str = None
     ref = await context.message.get_reference()
@@ -89,7 +90,7 @@ async def send_proxy_message(proxy: Proxy, message: str, context: Context, attac
         else:
             mention_str = ref.author.mention
 
-    message, embeds = await modify_message(proxy.owner, await Database.instance.get_guild_preferences(Guild(context.guild.id, context.platform)), message, [])
+    message, embeds = await modify_message(proxy.owner, await Database.instance.get_guild_preferences(Guild(channel.guild_id, context.platform)), message, [])
 
     if ref and do_reply:
         return await webhook.reply(
@@ -209,7 +210,7 @@ async def on_user_message(context: Context):
         return
 
     owner = await get_uid(context, on_unregistered=...)
-    guild = Guild(context.guild.id, context.platform)
+    guild = Guild(channel.guild_id, context.platform)
 
     roles = await (await context.get_member(context.author.id)).roles()
 

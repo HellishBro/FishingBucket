@@ -87,9 +87,8 @@ async def handle_reaction(context: ReactionActionEvent, server: Server):
 
     if context.emoji == "📝":
         lnk = await Database.instance.get_message_link(ctx.id, ctx.message.channel_id)
-        proxy_id = lnk.proxy_id
-        if proxy_id:
-            proxy = await Database.instance.get_proxy(proxy_id)
+        if lnk:
+            proxy = await Database.instance.get_proxy(lnk.proxy_id)
             if proxy.owner == uid:
                 await ctx.message.remove_reaction("📝", user.id)
                 channel = await user.get_dm()
