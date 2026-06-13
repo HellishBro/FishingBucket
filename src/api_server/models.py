@@ -6,18 +6,21 @@ from ..backend import models as source_models
 class EphemeralID(BaseModel):
     index: int
 
+    def __hash__(self) -> int:
+        return hash(f"new {self.index}")
+
+
 class ProxyGroup(BaseModel):
     id: int | EphemeralID
     name: str
     description: str | None
-    owner: int
     creation_date: float
     tag: str | None
     parent: int | EphemeralID | None
 
     @classmethod
     def from_source(cls, source: source_models.ProxyGroup) -> ProxyGroup:
-        return cls(id=source.id, name=source.name, description=source.description, owner=source.owner,
+        return cls(id=source.id, name=source.name, description=source.description,
                    creation_date=source.creation_date, tag=source.tag, parent=source.parent.id if source.parent else None)
 
     def to_source(self, id_slot: int | None, parent_slot: source_models.ProxyGroup | None, owner: int) -> source_models.ProxyGroup:
@@ -29,7 +32,6 @@ class Proxy(BaseModel):
     description: str | None
     avatar_url: str
     triggers: list[str]
-    owner: int
     times_used: int
     creation_date: float
     group: int | EphemeralID | None
@@ -41,7 +43,7 @@ class Proxy(BaseModel):
     @classmethod
     def from_source(cls, source: source_models.Proxy) -> Proxy:
         return cls(id=source.id, name=source.name, description=source.description, avatar_url=source.avatar_url,
-                   triggers=source.triggers, owner=source.owner, times_used=source.times_used, creation_date=source.creation_date,
+                   triggers=source.triggers, times_used=source.times_used, creation_date=source.creation_date,
                    group=source.group.id if source.group else None, nickname=source.nickname, forms=source.forms,
                    current_form=source.current_form, effective_name=source.effective_name)
 

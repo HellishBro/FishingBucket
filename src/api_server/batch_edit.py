@@ -25,7 +25,7 @@ async def handle_batch_edit(batch_edit: BatchEdit, owner: int, database: Databas
         if isinstance(group, int):
             group = await database.get_group(group)
         if group.owner != owner:
-            raise ValueError("Proxy group owner does not match the authenticated user.")
+            raise ValueError("Group owner does not match the authenticated user.")
 
     def ensure_new(proxy_or_group: Proxy | ProxyGroup):
         if isinstance(proxy_or_group.id, int):
@@ -47,11 +47,29 @@ async def handle_batch_edit(batch_edit: BatchEdit, owner: int, database: Databas
         if id_ is None: return id_
         return id_map[ID(id_.index, type_)]
 
+    async def get_group_parent(gid: int | EphemeralID) -> int | EphemeralID | None:
+        if gid in group_id_parent_map:
+            return group_id_parent_map[gid]
+        if isinstance(gid, int):
+            return (await database.get_group(gid)).parent
+        return None
+
+    async def does_recurse(this_id: int | EphemeralID) -> bool:
+        visited = []
+        current_id = this_id
+        while True:
+            visited.append(current_id)
+            visiting_parent_id = await get_group_parent(current_id)
+            if visiting_parent_id in visited: return True
+            if visiting_parent_id is None: return False
+            current_id = visiting_parent_id
+
 
     id_map: dict[ID, int] = {}
     encountered_ephemeral_ids: list[ID] = []
     modified: list[ModifiedItem[Proxy | ProxyGroup]] = []
     ignored_ids: list[ID] = []
+    group_id_parent_map: dict[int | EphemeralID, int | EphemeralID | None] = {}
 
     for delete_proxy_edit in filter_edit_type(batch_edit.edits, DeleteProxyEdit):
         await ensure_proxy(delete_proxy_edit.proxy_id)
@@ -71,6 +89,15 @@ async def handle_batch_edit(batch_edit: BatchEdit, owner: int, database: Databas
 
     for edit_proxy_group_edit in filter_edit_type(batch_edit.edits, EditProxyGroupField):
         await ensure_id_exists(edit_proxy_group_edit.id, "PROXY_GROUP")
+        field = edit_proxy_group_edit.kv.field
+        if field == "parent":
+            group_id_parent_map[edit_proxy_group_edit.id] = edit_proxy_group_edit.kv.value
+
+    for edit_proxy_group_edit in filter_edit_type(batch_edit.edits, EditProxyGroupField):
+        field = edit_proxy_group_edit.kv.field
+        if field == "parent":
+            if does_recurse(edit_proxy_group_edit.id):
+                raise ValueError("Group parent recurses.")
 
     for edit_proxy_edit in filter_edit_type(batch_edit.edits, EditProxyField):
         await ensure_id_exists(edit_proxy_edit.id, "PROXY")
