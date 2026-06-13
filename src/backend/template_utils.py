@@ -141,24 +141,28 @@ class Template:
             print(e)
             return False, ""
 
-    def _match(self, part_index: int, string: str, string_index: int, previous_match: str) -> MatchedResult:
-        if part_index >= len(self.parts):
+    def _match(self, part_index: int, string: str, string_index: int, previous_match: str, parts: list[TemplatePart]) -> MatchedResult:
+        if part_index >= len(parts):
             return MatchedResult(False)
 
-        part = self.parts[part_index]
+        part = parts[part_index]
         cropped = string[string_index:]
         if isinstance(part, TextPart):
             if cropped.startswith(part.content):
                 return MatchedResult(True, part.content, string_index + len(part.content))
             return MatchedResult(False)
 
-        inside = ""
-        new_string_index = string_index
-        for new_string_index in range(string_index, len(string)):
-            matched_result = self._match(part_index + 1, string, new_string_index, "")
-            if matched_result.match:
-                break
-            inside += string[new_string_index]
+        if not (len(parts) >= part_index + 1 and isinstance(part, ExprPart)):
+            inside = ""
+            new_string_index = string_index
+            for new_string_index in range(string_index, len(string)):
+                matched_result = self._match(part_index + 1, string, new_string_index, "", parts)
+                if matched_result.match:
+                    break
+                inside += string[new_string_index]
+        else:
+            inside = cropped
+            new_string_index = string_index
 
         matched, content = True, inside
         if part.content:
@@ -170,14 +174,29 @@ class Template:
         return MatchedResult(matched, content, new_string_index)
 
     def match(self, string: str) -> MatchedResult:
+        parts = self.parts[:]
+
+        if len(parts) >= 1 and isinstance(parts[0], TextPart):
+            if string.startswith(parts[0].content):
+                string = string[len(parts[0].content):]
+                parts.pop(0)
+            else:
+                return MatchedResult(False)
+        if len(parts) >= 1 and isinstance(parts[-1], TextPart):
+            if string.endswith(parts[-1].content):
+                string = string[:-len(parts[-1].content)]
+                parts.pop(-1)
+            else:
+                return MatchedResult(False)
+
         results = ""
         string_index = 0
         previous_match = ""
-        for part_index in range(len(self.parts)):
-            res = self._match(part_index, string, string_index, previous_match)
+        for part_index in range(len(parts)):
+            res = self._match(part_index, string, string_index, previous_match, parts)
             if res.match:
                 previous_match = res.content
-                if isinstance(self.parts[part_index], ExprPart):
+                if isinstance(parts[part_index], ExprPart):
                     results += res.content
                 string_index = res.new_index
             else:
