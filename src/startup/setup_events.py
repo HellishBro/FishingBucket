@@ -114,6 +114,8 @@ async def handle_reaction(context: ReactionActionEvent, server: Server):
 
 
 def setup(server: Server):
+    server.ready = False
+
     @server.event
     async def on_ready():
         server.ready = True
