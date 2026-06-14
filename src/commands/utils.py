@@ -102,7 +102,7 @@ async def paged_proxy_group_list(context: Context, groups: list[ProxyGroup], tit
     if not groups:
         await context.reply("", [Embed(
             f"{title} (0 total)",
-            f"It's as empty as a desert out here...\n\nTry running `{get_command_invocation('group register')}` to get started!"
+            f"It's as empty as a desert out here...\n\nTry running `{get_command_invocation('group register', context.platform)}` to get started!"
         )] + (additional_embeds or []))
         return
 
@@ -132,7 +132,7 @@ async def paged_proxy_list(context: Context, proxies: list[Proxy], title: str, p
     if not proxies:
         await context.reply("", [Embed(
             f"{title} (0 total)",
-            f"It's as empty as a desert out here...\n\nTry running `{get_command_invocation('register')}` to get started!"
+            f"It's as empty as a desert out here...\n\nTry running `{get_command_invocation('register', context.platform)}` to get started!"
         )] + (additional_embeds or []))
         return
 

@@ -68,7 +68,7 @@ def setup():
                 page = f"**{group.brief}** (`{group.canonical_name}`): {group.description}\n"
                 for cmd_id in group.commands:
                     cmd = get_commands()[cmd_id]
-                    page += f"\n- `{get_command_invocation(cmd_id)}` - {cmd.brief}"
+                    page += f"\n- `{get_command_invocation(cmd_id, context.platform)}` - {cmd.brief}"
                 pages.append(page)
 
             await paged(
@@ -82,7 +82,7 @@ def setup():
         commands = get_commands()
         if topic in commands:
             command = commands[topic]
-            description = f"**Usage**: `{Config.prefix()}{command.get_usage(strategize)}`\n\n{get_description(command)}\n\n**Examples**:"
+            description = f"**Usage**: `{Config.prefix(context.platform)}{command.get_usage(strategize)}`\n\n{get_description(command)}\n\n**Examples**:"
             examples = []
             for _ in range(10):
                 example = command.get_example_invocation()
@@ -93,7 +93,7 @@ def setup():
                     break
 
             for example in sorted(examples, key=len):
-                description += f"\n- `{Config.prefix()}{example}`"
+                description += f"\n- `{Config.prefix(context.platform)}{example}`"
 
             await context.reply("", [Embed(f"Help: {Config.prefix()}{topic}", description)])
             return
@@ -104,7 +104,7 @@ def setup():
             description = f"**{group.brief}** (`{group.canonical_name}`): {group.description}\n"
             for cmd_id in group.commands:
                 cmd = get_commands()[cmd_id]
-                description += f"\n- `{Config.prefix()}{cmd.get_usage(strategize)}` - {cmd.brief}"
+                description += f"\n- `{Config.prefix(context.platform)}{cmd.get_usage(strategize)}` - {cmd.brief}"
 
             await context.reply("", [Embed(f"Help: {group.brief}", description)])
             return

@@ -42,12 +42,12 @@ async def handle_message(context: Context):
         return
 
     try:
-        cmd = await get_command_awaitable(context, Config.instance.prefixes)
+        cmd = await get_command_awaitable(context, Config.cfg(context.platform).prefixes)
         if cmd:
             await cmd
             return
     except ParseError as e:
-        await context.reply(f"Error parsing command: {e.message}.\nUse `{Config.prefix()}help` to see command shape.")
+        await context.reply(f"Error parsing command: {e.message}.\nUse `{Config.prefix(context.platform)}help` to see command shape.")
         return
     except EarlyExitException:
         return

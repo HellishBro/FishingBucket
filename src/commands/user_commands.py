@@ -92,7 +92,7 @@ def setup():
         account_links[new_code] = uid, key, now, "@" + context.author.full_tag
 
         await channel.send(f"Execute this entire command from the account that you want to link from to complete the process!")
-        await channel.send(f"{Config.prefix()}link code {new_code}")
+        await channel.send(f"{Config.prefix(context.platform)}link code {new_code}")
 
         this_channel = await context.get_channel(context.message.channel_id)
         if not this_channel.dm:

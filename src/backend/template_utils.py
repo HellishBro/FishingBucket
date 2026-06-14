@@ -253,7 +253,7 @@ class Template:
     def get_default_metatext_variables(context: Context) -> dict:
         return {
             "config": Config.instance,
-            "prefix": Config.prefix(),
+            "prefix": Config.prefix(context.platform),
             "name": Config.name(),
             "context": {
                 "platform": context.platform.name

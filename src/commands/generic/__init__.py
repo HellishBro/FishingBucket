@@ -56,8 +56,8 @@ def make_command_group(
     return group
 
 
-def get_command_invocation(command: str) -> str:
-    return f"{Config.prefix()}{command_registry[command].get_usage(strategize)}"
+def get_command_invocation(command: str, platform: Platform) -> str:
+    return f"{Config.prefix(platform)}{command_registry[command].get_usage(strategize)}"
 
 
 def get_commands() -> dict[str, Command]:

@@ -21,7 +21,7 @@ async def get_uid(context: Context, create: bool = False, on_unregistered: Await
         if on_unregistered:
             await on_unregistered
         else:
-            await context.reply(f"Error: you do not have an account! You can create one by using the `{get_command_invocation('register')}` command.")
+            await context.reply(f"Error: you do not have an account! You can create one by using the `{get_command_invocation('register', context.platform)}` command.")
         raise EarlyExitException()
     return uid
 

@@ -40,6 +40,7 @@ class PlatformConfig(BaseModel):
     bot_invite: str
     client_id: int
     api_url: HttpUrl
+    prefixes: list[str]
 
 
 class Config_(BaseModel):
@@ -47,7 +48,6 @@ class Config_(BaseModel):
     discord: PlatformConfig | None = None
 
     name: str
-    prefixes: list[str]
     database_file: str
     data_path: str
     webhook: str
@@ -88,8 +88,8 @@ class Config:
         return None
 
     @classmethod
-    def prefix(cls) -> str:
-        return cls.instance.prefixes[0]
+    def prefix(cls, platform: Platform) -> str:
+        return cls.cfg(platform).prefixes[0]
 
     @classmethod
     def name(cls) -> str:
