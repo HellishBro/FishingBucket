@@ -26,6 +26,7 @@ class NativeProxy(BaseModel):
     nickname: str
     forms: dict[str, AnyHttpUrl]
     current_form: str | None
+    pronouns: str | None = None
 
 
 class NativeRoot(BaseModel):
@@ -68,7 +69,8 @@ class NativeImporter(Importer):
                     k: str(v)
                     for k, v in proxy.forms.items()
                 },
-                proxy.current_form
+                proxy.current_form,
+                proxy.pronouns
             ))
 
         while groups_queue:
@@ -112,7 +114,8 @@ class NativeExporter(Exporter):
                 group=group_obj_idx_map.get(id(proxy.group), None),
                 nickname=proxy.nickname or "",
                 forms=proxy.forms or {},
-                current_form=proxy.current_form or None
+                current_form=proxy.current_form or None,
+                pronouns=proxy.pronouns
             ))
 
         data = NativeRoot(proxies=serialized_proxies, groups=serialized_groups)

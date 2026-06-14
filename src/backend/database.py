@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from .cache import TTLCache
 from .models import Proxy, ProxyGroup, ID, Platform
 
-lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner", "times_used", "creation_date", "proxy_group", "nickname", "proxy_forms", "current_form"]
+lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner", "times_used", "creation_date", "proxy_group", "nickname", "proxy_forms", "current_form", "pronouns"]
 proxy_fields = ", ".join(lst_proxy_fields)
 group_fields = ", ".join(["id", "name", "description", "owner", "creation_date", "tag", "parent"])
 
@@ -32,7 +32,7 @@ def upsert_query(table: str, key: str | Collection[str], key_check: Any | Collec
     params = tuple(key_checks) + tuple(defaults) + tuple(values) + tuple(key_checks)
     return sql_str, params
 
-class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list private_forms dice_functions")):
+class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list private_forms dice_functions private_pronouns")):
     private_description: bool
     private_trigger: bool
     private_metadata: bool
@@ -40,6 +40,7 @@ class UserPreference(namedtuple("UserPreference", "private_description private_t
     private_list: bool
     private_forms: bool
     dice_functions: bytes
+    private_pronouns: bool
 
     @property
     def public_description(self) -> bool: return not self.private_description
@@ -58,6 +59,9 @@ class UserPreference(namedtuple("UserPreference", "private_description private_t
 
     @property
     def public_forms(self) -> bool: return not self.private_forms
+
+    @property
+    def public_pronouns(self) -> bool: return not self.private_pronouns
 
 
 class GuildPreference(namedtuple("GuildPreference", "disallow_by_default logging_channel dice_functions guild_type")):
@@ -141,7 +145,8 @@ class Database:
             proxy_group INTEGER,
             nickname TEXT,
             proxy_forms TEXT,
-            current_form TEXT
+            current_form TEXT,
+            pronouns TEXT
         );
         """)
         await self.connection.execute("""
@@ -207,7 +212,8 @@ class Database:
             private_group BOOLEAN,
             private_list BOOLEAN,
             private_forms BOOLEAN,
-            dice_functions BLOB
+            dice_functions BLOB,
+            private_pronouns BOOLEAN
         );
         """)
         await self.connection.execute("""
@@ -686,6 +692,20 @@ class Database:
                 await self.connection.commit()
             version += 1
 
+        if version == 13:
+            try:
+                await self.connection.execute("""
+                ALTER TABLE proxies ADD COLUMN pronouns TEXT;
+                """)
+                await self.connection.execute("""
+                ALTER TABLE user_settings ADD COLUMN private_pronouns BOOLEAN;
+                """)
+            except:
+                pass
+            finally:
+                await self.connection.commit()
+            version += 1
+
         await self.set_global_data("version", str(version), version)
 
     async def get_user_id(self, sso: int, platform: Platform = Platform.Fluxer, create: bool = True) -> int:
@@ -800,7 +820,8 @@ class Database:
             private_group: bool | None = None,
             private_list: bool | None = None,
             private_forms: bool | None = None,
-            dice_functions: bytes | None = None
+            dice_functions: bytes | None = None,
+            private_pronouns: bool | None = None
     ):
         names = {
             "private_description": (private_description, False),
@@ -809,7 +830,8 @@ class Database:
             "private_group": (private_group, False),
             "private_list": (private_list, False),
             "private_forms": (private_forms, False),
-            "dice_functions": (dice_functions, b"")
+            "dice_functions": (dice_functions, b""),
+            "private_pronouns": (private_pronouns, False)
         }
         changes = [k for k, (v, _) in names.items() if v is not None]
         values = [v for v, _ in names.values() if v is not None]
@@ -818,7 +840,7 @@ class Database:
             return
 
         prefs = await self.get_user_preferences(user_id)
-        true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, private_forms, dice_functions)
+        true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, private_forms, dice_functions, private_pronouns)
         true_compare_list = tuple((a if a is not None else b for a, b in zip(true_compare_list, prefs)))
         if prefs != true_compare_list:
             await self.connection.execute(*upsert_query("user_settings", "user_id", user_id, names, changes, values))
@@ -832,7 +854,7 @@ class Database:
                 (user_id, )
         ) as cursor:
             res = await cursor.fetchone()
-            if not res: return UserPreference(False, False, False, False, False, False, b"")
+            if not res: return UserPreference(False, False, False, False, False, False, b"", False)
             else: return UserPreference(*res[1:])
 
     @Cache.latest_proxy_message_from_user.cache_async()
@@ -1024,8 +1046,8 @@ class Database:
     async def put_proxy(self, proxy: Proxy) -> Proxy:
         proxy.triggers = [t for t in proxy.triggers if t]
         cursor = await self.connection.execute(
-            "INSERT INTO proxies (name, description, avatar_url, trigger, owner, times_used, creation_date, proxy_group, nickname, proxy_forms, current_form) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (proxy.name, proxy.description, proxy.avatar_url, "\n".join(proxy.triggers), proxy.owner, proxy.times_used, time.time(), proxy.group.id if proxy.group else None, proxy.nickname, json.dumps(proxy.forms), proxy.current_form)
+            "INSERT INTO proxies (name, description, avatar_url, trigger, owner, times_used, creation_date, proxy_group, nickname, proxy_forms, current_form, pronouns) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (proxy.name, proxy.description, proxy.avatar_url, "\n".join(proxy.triggers), proxy.owner, proxy.times_used, time.time(), proxy.group.id if proxy.group else None, proxy.nickname, json.dumps(proxy.forms), proxy.current_form, proxy.pronouns)
         )
         await self.connection.commit()
         proxy.id = ID(cursor.lastrowid)
@@ -1144,6 +1166,15 @@ class Database:
         )
         if prox := await self.get_proxy(id_):
             prox.nickname = nickname
+        await self.connection.commit()
+
+    async def update_pronouns(self, id_: int, pronouns: str):
+        await self.connection.execute(
+            "UPDATE proxies SET pronouns = ? WHERE id = ?",
+            (pronouns, id_)
+        )
+        if prox := await self.get_proxy(id_):
+            prox.pronouns = pronouns
         await self.connection.commit()
 
     async def update_group_name(self, id_: int, name: str):

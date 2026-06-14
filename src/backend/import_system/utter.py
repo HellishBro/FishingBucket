@@ -20,6 +20,7 @@ class UtterMember(BaseModel):
     proxy_tags: list[ProxyTag]
     keep_proxy: bool | None = None
     description: str | None = None
+    pronouns: str | None = None
 
 
 class UtterConfig(BaseModel):
@@ -49,6 +50,7 @@ class UtterImporter(Importer):
                 .replace("{tag}", root.tag)
                 .replace("{rawname}", "{proxy.name}")
                 .replace("{description}", "{proxy.description}")
+                .replace("{pronouns}", "{proxy.pronouns}")
             ).strip() or "",
             None
         )
@@ -77,7 +79,8 @@ class UtterImporter(Importer):
                 default_group,
                 member.displayname or "",
                 {},
-                None
+                None,
+                member.pronouns
             )
 
             members_map[member.id] = p

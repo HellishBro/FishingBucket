@@ -86,6 +86,22 @@ def setup():
         await context.reply("", [embed])
 
 
+    @hook_command("set pronouns")
+    async def _(context: Context, proxy: Proxy, new_pronouns: str | None):
+        await Database.instance.update_pronouns(proxy.id, new_pronouns)
+        if new_pronouns:
+            embed = Embed(
+                "Proxy Updated!",
+                f"The pronouns for **{proxy.name}** has been changed to **{new_pronouns}**!"
+            )
+        else:
+            embed = Embed(
+                "Proxy Updated!",
+                f"The pronouns for **{proxy.name}** has been reset!"
+            )
+        await context.reply("", [embed])
+
+
     @hook_command("set description")
     async def _(context: Context, proxy: Proxy, new_description: str | None):
         if new_description is None:

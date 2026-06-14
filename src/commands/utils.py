@@ -66,6 +66,10 @@ def get_proxies_text(bunch: list[Proxy], user_preference: UserPreference, detail
         if user_preference.public_trigger or detailed:
             lns.append(f"- Triggers: {', '.join(f'`{trigger}`' for trigger in prox.triggers) if prox.triggers and any(bool(t) for t in prox.triggers) else '*N/A*'}")
         lns.append(f"- Avatar: [source]({prox.avatar_url})")
+        if user_preference.public_pronouns or detailed:
+            if prox.pronouns:
+                lns.append(f"- Pronouns: {prox.pronouns}")
+
         if user_preference.public_forms or detailed:
             if prox.forms:
                 lns.append(f"- Forms:")

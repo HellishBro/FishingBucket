@@ -199,6 +199,8 @@ async def handle_batch_edit(batch_edit: BatchEdit, owner: int, database: Databas
             await database.update_forms(proxy_id, value)
         elif field == "current_form":
             await database.update_current_form(proxy_id, value)
+        elif field == "pronouns":
+            await database.update_pronouns(proxy_id, value)
 
     edited_proxy_groups = [*set(edited_proxy_groups)]
     edited_proxies = [*set(edited_proxies)]

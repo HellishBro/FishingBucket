@@ -39,17 +39,18 @@ class Proxy(BaseModel):
     forms: dict[str, str]
     current_form: str | None
     effective_name: str
+    pronouns: str | None
 
     @classmethod
     def from_source(cls, source: source_models.Proxy) -> Proxy:
         return cls(id=source.id, name=source.name, description=source.description, avatar_url=source.avatar_url,
                    triggers=source.triggers, times_used=source.times_used, creation_date=source.creation_date,
                    group=source.group.id if source.group else None, nickname=source.nickname, forms=source.forms,
-                   current_form=source.current_form, effective_name=source.effective_name)
+                   current_form=source.current_form, effective_name=source.effective_name, pronouns=source.pronouns)
 
     def to_source(self, id_slot: int | None, group_slot: source_models.ProxyGroup | None, owner: int) -> source_models.Proxy:
         return source_models.Proxy(id_slot, self.name, self.description, self.avatar_url, self.triggers, owner,
-                                   self.times_used, self.creation_date, group_slot, self.nickname, self.forms, self.current_form)
+                                   self.times_used, self.creation_date, group_slot, self.nickname, self.forms, self.current_form, self.pronouns)
 
 
 class NewProxyEdit(BaseModel):
@@ -100,6 +101,10 @@ class EditProxyCurrentForm(BaseModel):
     field: Literal["current_form"]
     value: str | None
 
+class EditProxyPronouns(BaseModel):
+    field: Literal["pronouns"]
+    value: str | None
+
 class EditProxyField(BaseModel):
     edit_type: Literal["EDIT_PROXY_FIELD"]
     id: int | EphemeralID
@@ -111,7 +116,8 @@ class EditProxyField(BaseModel):
         EditProxyGroup |
         EditProxyNickname |
         EditProxyForms |
-        EditProxyCurrentForm
+        EditProxyCurrentForm |
+        EditProxyPronouns
     ) = Field(discriminator="field")
 
 class EditProxyGroupName(BaseModel):

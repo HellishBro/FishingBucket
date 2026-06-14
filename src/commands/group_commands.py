@@ -89,7 +89,7 @@ def setup():
         t = normalize_emojis(tag.string)
         await Database.instance.update_group_tag(group.id, t)
         group.tag = t
-        example_proxy = Proxy(None, "Example Proxy", "This is an example proxy", Proxy.random_avatar(), ["{}"], 0, 0, 0, group, None, {}, None)
+        example_proxy = Proxy(None, "Example Proxy", "This is an example proxy", Proxy.random_avatar(), ["{}"], 0, 0, 0, group, None, {}, None, None)
         embed = Embed(
             "Group Updated!",
             f"The tag for *{group.name}* has been changed! Proxies sent using this group will have their name be displayed as **{example_proxy.effective_name}**"

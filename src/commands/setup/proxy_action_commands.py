@@ -1,6 +1,7 @@
 import random
 
 from ..generic import make_command_group, make_command, Argument
+from ..generic.misc import lorem_ipsum
 from ..generic.strategies import URLStrategy, Optional, OptionList, List, StringStrategy, Sequence
 from ..specific import ProxyStrategy, TemplateStrategy
 
@@ -157,6 +158,34 @@ def setup():
             ]
         )
     )
+
+
+    proxact_group.append(
+        make_command(
+            {
+                "set pronouns": [
+                    "pronouns",
+                    "s pronouns"
+                ]
+            },
+            "Updates a proxy's pronouns.",
+            """
+            Updates a proxy's pronouns.
+            """,
+            [
+                Argument(
+                    "proxy",
+                    ProxyStrategy()
+                ),
+                Argument(
+                    "new pronoun",
+                    Optional(str, None),
+                    lambda: random.choice([lorem_ipsum("MINI")(), random.choice(["he", "she", "they", "it", "any"]) + "/" + random.choice(["him", "her", "them", "its", "all"]), ""])
+                )
+            ]
+        )
+    )
+
 
     proxact_group.append(
         make_command(

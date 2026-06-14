@@ -46,18 +46,19 @@ class Proxy:
     nickname: str | None
     forms: dict[str, str]
     current_form: str | None
+    pronouns: str | None
 
     @staticmethod
     def random_avatar() -> str:
         return f"https://raw.githubusercontent.com/fluxerapp/static/refs/heads/main/avatars/{random.randint(0, 5)}.png"
 
     @classmethod
-    def from_database(cls, data: tuple[int, str, str, str, str, int, int, float, int | None, str | None, str | None, str | None], groups: list[ProxyGroup]) -> Proxy:
+    def from_database(cls, data: tuple[int, str, str, str, str, int, int, float, int | None, str | None, str | None, str | None, str | None], groups: list[ProxyGroup]) -> Proxy:
         group = None
         if data[8] and groups:
             group = [g for g in groups if g.id == data[8]][0]
 
-        return cls(ID(data[0]), data[1], data[2], data[3], data[4].split("\n"), data[5], data[6], data[7], group, data[9], json.loads(data[10] or "{}"), data[11])
+        return cls(ID(data[0]), data[1], data[2], data[3], data[4].split("\n"), data[5], data[6], data[7], group, data[9], json.loads(data[10] or "{}"), data[11], data[12])
 
     @property
     def effective_name(self) -> str:
@@ -84,7 +85,10 @@ class Proxy:
                     "times_used": self.times_used,
                     "creation_date": self.creation_date,
                     "group": g,
-                    "nickname": self.nickname
+                    "nickname": self.nickname,
+                    "forms": self.forms,
+                    "form": self.current_form,
+                    "pronouns": self.pronouns or ""
                 },
                 "group": g
             }, n)

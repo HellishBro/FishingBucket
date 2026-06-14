@@ -148,7 +148,7 @@ class TemplateStrategy(Strategy):
         for part in template.parts:
             if isinstance(part, ExprPart):
                 if part.content:
-                    if not all(var in part.content for var in self.variables):
+                    if not any(var in part.content for var in self.variables):
                         raise ParseError(f"template, if not empty, must refer one of these variables: `{'`, `'.join(self.variables)}`")
 
         return template

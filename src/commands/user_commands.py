@@ -28,7 +28,8 @@ def setup():
             "private_metadata": False,
             "private_group": False,
             "private_list": False,
-            "private_forms": False
+            "private_forms": False,
+            "private_pronouns": False
         }
         for k, v in preferences._asdict().items():
             if k in pref_dict:
@@ -40,7 +41,8 @@ def setup():
             "private_metadata": "metadata",
             "private_group": "groups",
             "private_list": "list",
-            "private_forms": "forms"
+            "private_forms": "forms",
+            "private_pronouns": "pronouns"
         }
 
         public_options = [m[p] for p, v in pref_dict.items() if not v]
@@ -54,7 +56,7 @@ def setup():
     @hook_command("privacy set")
     async def _(context: Context, status: Literal["private"] | Literal["public"], options: list[str] | Literal["all"]):
         if options == "all":
-            options = ["description", "triggers", "metadata", "groups", "list", "forms"]
+            options = ["description", "triggers", "metadata", "groups", "list", "forms", "pronouns"]
 
         m = {
             "description": "private_description",
@@ -62,7 +64,8 @@ def setup():
             "metadata": "private_metadata",
             "groups": "private_group",
             "list": "private_list",
-            "forms": "private_forms"
+            "forms": "private_forms",
+            "pronouns": "private_pronouns"
         }
 
         public = status == "private"

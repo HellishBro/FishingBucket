@@ -33,6 +33,7 @@ class SystemMember(BaseModel):
     keep_proxy: bool | None = None
     message_count: NonNegativeInt | None = None
     proxy_tags: list[ProxyTag]
+    pronouns: str | None = None
 
 
 class SystemConfig(BaseModel):
@@ -112,7 +113,8 @@ class PluralKitImporter(Importer):
                 default_group,
                 member.display_name or "",
                 {},
-                None
+                None,
+                member.pronouns
             )
 
             members_map[member.id] = p

@@ -80,6 +80,7 @@ class TupperboxImporter(Importer):
                 group_mapping.get(tupper.group_id),
                 nick or "",
                 {},
+                None,
                 None
             )
 
