@@ -17,17 +17,19 @@ from ..commands.generic import get_command_awaitable, ParseError, EarlyExitExcep
 
 
 editing_proxy_messages: dict[tuple[int, Platform], tuple[int, Message]] = {} # (user_id, platform) => (channel id, message)
-handled_messages: dict[tuple[int, Platform], float] = {} # (message_id, platform) => timestamp
+handled_messages: dict[tuple[int, Platform, str], float] = {} # (message_id, platform, content) => timestamp
 
 
 async def message_wrapper(context: Context):
     if context.is_bot: return
-    if (context.id, context.platform) in handled_messages: return
 
-    handled_messages[context.id, context.platform] = time.time()
+    content = context.content
+    if (context.id, context.platform, content) in handled_messages: return
+
+    handled_messages[context.id, context.platform, content] = time.time()
     await handle_message(context)
     await asyncio.sleep(1)
-    handled_messages.pop((context.id, context.platform))
+    handled_messages.pop((context.id, context.platform, content))
 
 
 async def handle_message(context: Context):
@@ -135,7 +137,7 @@ def setup_fluxer(server: FluxerServer):
         await message_wrapper(context)
 
     @server.event
-    async def on_edit(message: fluxer.Message):
+    async def on_message_edit(message: fluxer.Message):
         context = FluxerContext(FluxerMessage(message, server.bot), server.bot)
         await message_wrapper(context)
 
@@ -155,8 +157,9 @@ def setup_fluxer(server: FluxerServer):
 def setup_discord(server: DiscordServer):
     @server.event
     async def on_message(message: discord.Message):
-        context = DiscordContext(DiscordMessage(message, server.bot), server.bot)
-        await message_wrapper(context)
+        if message.type in (discord.MessageType.default, discord.MessageType.reply):
+            context = DiscordContext(DiscordMessage(message, server.bot), server.bot)
+            await message_wrapper(context)
 
     @server.event
     async def on_message_edit(before: discord.Message, after: discord.Message):

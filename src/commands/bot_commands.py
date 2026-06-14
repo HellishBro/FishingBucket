@@ -95,7 +95,7 @@ def setup():
             for example in sorted(examples, key=len):
                 description += f"\n- `{Config.prefix(context.platform)}{example}`"
 
-            await context.reply("", [Embed(f"Help: {Config.prefix()}{topic}", description)])
+            await context.reply("", [Embed(f"Help: {Config.prefix(context.platform)}{topic}", description)])
             return
 
         groups = get_command_groups()

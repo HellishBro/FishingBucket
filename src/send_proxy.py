@@ -228,6 +228,9 @@ async def on_user_message(context: Context):
             ctx = None
 
             for i, (proxy, m) in enumerate(proxied):
+                if not (m or context.message.attachments):
+                    return
+
                 try:
                     try:
                         ctx = await send_proxy_message(proxy, m, context, context.message.attachments, True, i == 0)
