@@ -22,11 +22,15 @@ async def _(proxy_id: int, session: Session = Depends(require_session)):
 
 @router.get("/proxies", response_model=list[Proxy])
 async def _(session: Session = Depends(require_session)) -> list[Proxy]:
+    if session.user_id == -1:
+        return []
     proxies = await app.context.database.get_user_proxies(session.user_id)
     return [Proxy.from_source(proxy) for proxy in proxies]
 
 @router.get("/groups", response_model=list[ProxyGroup])
 async def _(session: Session = Depends(require_session)) -> list[ProxyGroup]:
+    if session.user_id == -1:
+        return []
     groups = await app.context.database.get_user_groups(session.user_id)
     return [ProxyGroup.from_source(group) for group in groups]
 
@@ -40,6 +44,10 @@ async def _(group_id: int, session: Session = Depends(require_session)) -> Proxy
 @router.post("/edit", response_model=ModifiedItemResponse)
 async def _(edits: BatchEdit, session: Session = Depends(require_session)) -> ModifiedItemResponse:
     try:
+        if session.user_id == -1:
+            uid = await app.context.database.get_user_id(session.sso_id, session.platform, True)
+            session = await Database.instance.update_user_id(session.session_id, uid)
+
         return await handle_batch_edit(edits, session.user_id, app.context.database)
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -71,10 +79,8 @@ async def _(request: Request) -> LoginInformation:
                 obj = await resp_user.json()
                 user_id = int(obj["id"])
                 native_id = await app.context.database.get_user_id(user_id, Platform.Fluxer, False)
-                if native_id != -1:
-                    session_id = await Database.instance.new_session(native_id, obj, Platform.Fluxer)
-                    return LoginInformation(session_id=session_id, user=obj, platform="fluxer")
-                raise HTTPException(403, "You do not have an account!")
+                session_id = await Database.instance.new_session(native_id, obj, Platform.Fluxer, user_id)
+                return LoginInformation(session_id=session_id, user=obj, platform="fluxer")
 
 @router.post("/auth/discord/login", response_model=LoginInformation)
 async def _(request: Request) -> LoginInformation:
@@ -98,13 +104,13 @@ async def _(request: Request) -> LoginInformation:
                 obj = await resp_user.json()
                 user_id = int(obj["id"])
                 native_id = await app.context.database.get_user_id(user_id, Platform.Discord, False)
-                if native_id != -1:
-                    session_id = await Database.instance.new_session(native_id, obj, Platform.Discord)
-                    return LoginInformation(session_id=session_id, user=obj, platform="discord")
-                raise HTTPException(403, "You do not have an account!")
-
+                session_id = await Database.instance.new_session(native_id, obj, Platform.Discord, user_id)
+                return LoginInformation(session_id=session_id, user=obj, platform="discord")
 
 @router.post("/auth/logout", status_code=204)
 async def _(session: Session = Depends(require_session)) -> Response:
-    await Database.instance.remove_all_sessions(session.user_id)
+    if session.user_id == -1:
+        await Database.instance.remove_sessions_sso_id(session.sso_id)
+    else:
+        await Database.instance.remove_all_sessions(session.user_id)
     return Response(status_code=204)
