@@ -1,4 +1,5 @@
 import json
+from typing import Literal
 
 from pydantic import BaseModel, AnyHttpUrl, PositiveFloat, NonNegativeInt
 
@@ -18,13 +19,13 @@ class NativeGroup(BaseModel):
 class NativeProxy(BaseModel):
     name: str
     description: str
-    avatar_url: AnyHttpUrl
+    avatar_url: AnyHttpUrl | Literal[""]
     triggers: list[str]
     times_used: NonNegativeInt
     time: PositiveFloat
     group: str | None
     nickname: str
-    forms: dict[str, AnyHttpUrl]
+    forms: dict[str, AnyHttpUrl | Literal[""]]
     current_form: str | None
     pronouns: str | None = None
 
