@@ -172,11 +172,11 @@ def setup():
                 Argument(
                     "setting",
                     OneOf(
-                        bool,
-                        ProxyStrategy(),
                         Literal(
                             "latch"
-                        )
+                        ),
+                        bool,
+                        ProxyStrategy()
                     )
                 ),
                 Argument(
