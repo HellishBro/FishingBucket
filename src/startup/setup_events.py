@@ -75,7 +75,7 @@ async def handle_reaction(context: ReactionActionEvent, server: Server):
                     "Proxied Message",
                     f"**Proxy**: {proxy.name}\n**Owner**: <@{lnk.platform_user}> (`{lnk.platform_user}`)\n**Message Link**: [link]({await ctx.message.mention()})\n**Message**:\n{'\n'.join(('> ' + ln) for ln in ctx.content.split('\n'))}"
                 )
-                dm = await ctx.author.get_dm()
+                dm = await user.get_dm()
                 await dm.send("", [e])
                 await ctx.message.remove_reaction("❓", user.id)
                 return
