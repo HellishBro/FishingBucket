@@ -184,4 +184,8 @@ class ModifiedItemResponse(BaseModel):
 class LoginInformation(BaseModel):
     session_id: str
     user: dict
+    expires: float
     platform: Literal["discord"] | Literal["fluxer"]
+
+class RefreshLogin(BaseModel):
+    expires: float

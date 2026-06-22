@@ -102,22 +102,19 @@ class Database:
                 await self.connection.commit()
                 Cache.sessions.invalidate(session_id)
                 return None
-            new_expires = now + SESSION_TTL
-            await self.connection.execute("UPDATE sessions SET expires = ? WHERE id = ?", (new_expires, session_id))
-            await self.connection.commit()
-            sess.expires = new_expires
             Cache.sessions.set(session_id, sess)
             return sess
 
-    async def new_session(self, user_id: int, data: dict, platform: Platform, sso_id: int) -> str:
+    async def new_session(self, user_id: int, data: dict, platform: Platform, sso_id: int) -> tuple[str, float]:
         session_id = secrets.token_hex(64)
         now = this_time()
+        expires = now + SESSION_TTL
         await self.connection.execute(
             "INSERT INTO sessions (id, user_id, data, created, expires, platform_type, sso_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (session_id, user_id, json.dumps(data), now, now + SESSION_TTL, platform.get(), sso_id)
+            (session_id, user_id, json.dumps(data), now, expires, platform.get(), sso_id)
         )
         await self.connection.commit()
-        return session_id
+        return session_id, expires
 
     async def remove_all_sessions(self, user_id: int):
         async with self.connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id, )):
@@ -129,5 +126,10 @@ class Database:
 
     async def update_user_id(self, session_id: str, new_user_id: int) -> Session:
         async with self.connection.execute("UPDATE sessions SET user_id = ? WHERE id = ?", (new_user_id, session_id)):
+            Cache.sessions.invalidate(session_id)
+            return await self.get_session(session_id)
+
+    async def extend_session(self, session_id: str, new_time: float) -> Session:
+        async with self.connection.execute("UPDATE sessions SET expires = ? WHERE id = ?", (new_time, session_id)) as cursor:
             Cache.sessions.invalidate(session_id)
             return await self.get_session(session_id)

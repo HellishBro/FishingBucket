@@ -5,9 +5,9 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.requests import Request
 
 from .api_app import Application, require_session
-from .api_database import Session, Database
+from .api_database import Session, Database, this_time, SESSION_TTL
 from .batch_edit import handle_batch_edit
-from .models import Proxy, ProxyGroup, ModifiedItemResponse, BatchEdit, LoginInformation
+from .models import Proxy, ProxyGroup, ModifiedItemResponse, BatchEdit, LoginInformation, RefreshLogin
 from ..backend.models import Platform
 
 app = Application()
@@ -79,8 +79,8 @@ async def _(request: Request) -> LoginInformation:
                 obj = await resp_user.json()
                 user_id = int(obj["id"])
                 native_id = await app.context.database.get_user_id(user_id, Platform.Fluxer, False)
-                session_id = await Database.instance.new_session(native_id, obj, Platform.Fluxer, user_id)
-                return LoginInformation(session_id=session_id, user=obj, platform="fluxer")
+                session_id, expires = await Database.instance.new_session(native_id, obj, Platform.Fluxer, user_id)
+                return LoginInformation(session_id=session_id, user=obj, platform="fluxer", expires=expires)
 
 @router.post("/auth/discord/login", response_model=LoginInformation)
 async def _(request: Request) -> LoginInformation:
@@ -104,8 +104,8 @@ async def _(request: Request) -> LoginInformation:
                 obj = await resp_user.json()
                 user_id = int(obj["id"])
                 native_id = await app.context.database.get_user_id(user_id, Platform.Discord, False)
-                session_id = await Database.instance.new_session(native_id, obj, Platform.Discord, user_id)
-                return LoginInformation(session_id=session_id, user=obj, platform="discord")
+                session_id, expires = await Database.instance.new_session(native_id, obj, Platform.Discord, user_id)
+                return LoginInformation(session_id=session_id, user=obj, platform="discord", expires=expires)
 
 @router.post("/auth/logout", status_code=204)
 async def _(session: Session = Depends(require_session)) -> Response:
@@ -114,3 +114,9 @@ async def _(session: Session = Depends(require_session)) -> Response:
     else:
         await Database.instance.remove_all_sessions(session.user_id)
     return Response(status_code=204)
+
+@router.post("/auth/extend", response_model=RefreshLogin)
+async def _(session: Session = Depends(require_session)) -> RefreshLogin:
+    now = this_time()
+    new_session = await Database.instance.extend_session(session.session_id, now + SESSION_TTL)
+    return RefreshLogin(expires=new_session.expires)
