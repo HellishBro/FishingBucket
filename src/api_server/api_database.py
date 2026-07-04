@@ -62,7 +62,7 @@ class Database:
         CREATE TABLE IF NOT EXISTS meta (
             db_version INTEGER
         );
-        INSERT INTO meta (db_version) SELECT 0 WHERE NOT EXISTS (SELECT 0 FROM meta);
+        INSERT INTO meta (db_version) SELECT 2 WHERE NOT EXISTS (SELECT 0 FROM meta);
         """)
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_session_ids ON sessions (id)")
         await self.connection.commit()
