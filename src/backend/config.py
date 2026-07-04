@@ -1,6 +1,7 @@
+import datetime
 import json
 
-from pydantic import BaseModel, FilePath, HttpUrl
+from pydantic import BaseModel, FilePath, HttpUrl, DirectoryPath
 
 from .models import Platform
 
@@ -48,9 +49,11 @@ class Config_(BaseModel):
     discord: PlatformConfig | None = None
 
     name: str
-    database_file: str
-    data_path: str
+    database_file: FilePath
+    data_path: DirectoryPath
     webhook: str
+    log_directory: DirectoryPath
+    log_time_format: str
 
     use_extras: bool = False
     donation: HttpUrl | None = None
@@ -73,11 +76,13 @@ class Config_(BaseModel):
 
 class Config:
     instance: Config_
+    init_time: datetime.datetime
 
     def __init__(self, filename: str = "config.json"):
         with open(filename) as f:
             conf = json.loads(f.read())
             Config.instance = Config_(**conf)
+        Config.init_time = datetime.datetime.now()
 
     @classmethod
     def cfg(cls, item: Platform) -> PlatformConfig | None:

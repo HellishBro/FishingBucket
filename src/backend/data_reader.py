@@ -7,7 +7,7 @@ from typing import Any
 class DataReader:
     instance: DataReader
 
-    def __init__(self, data_directory: str):
+    def __init__(self, data_directory: str | Path):
         DataReader.instance = self
         self.data_directory = Path(data_directory)
         self.loaded_files: dict[str, Any] = {}

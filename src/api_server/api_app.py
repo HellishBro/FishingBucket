@@ -4,6 +4,10 @@ from fastapi.params import Header
 
 from .api_database import Database, Session
 from .context import ApplicationContext
+from ..backend import logging
+from ..backend.logging import start_log
+
+print, error = start_log("api", "-api")
 
 async def require_session(authorization: str | None = Header(None)) -> Session:
     if not authorization:
@@ -44,7 +48,39 @@ class Application:
             self.app.include_router(r)
 
         host, port = config.api_server.domain, config.api_server.port
-        uv_conf = uvicorn.Config(self.app, host, port, reload=False)
+        log_file = logging.get_log_file("-uvi")
+        uv_conf = uvicorn.Config(self.app, host, port, reload=False, log_config={
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "default": {
+                    "()": "uvicorn.logging.DefaultFormatter",
+                    "fmt": "%(levelprefix)s %(message)s",
+                    "use_colors": None,
+                },
+                "access": {
+                    "()": "uvicorn.logging.AccessFormatter",
+                    "fmt": '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+                },
+            },
+            "handlers": {
+                "default": {
+                    "formatter": "default",
+                    "class": "logging.FileHandler",
+                    "filename": log_file,
+                },
+                "access": {
+                    "formatter": "access",
+                    "class": "logging.FileHandler",
+                    "filename": log_file,
+                },
+            },
+            "loggers": {
+                "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+                "uvicorn.error": {"level": "INFO"},
+                "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+            },
+        })
         self.server = uvicorn.Server(uv_conf)
         await self.server.serve()
         print(f"API server is running at {host}:{port}!")

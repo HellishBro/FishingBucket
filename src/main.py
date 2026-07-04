@@ -1,22 +1,25 @@
 import asyncio
 import signal
-import traceback
 import time
 import os
 
 from .backend.config import Config
-from .backend.data_reader import DataReader
-from .backend.database import Database
-from .interaction import Interactions
-from .backend.cache import CacheStatus
-from . import commands
-from .api_server import app as api_app, ApplicationContext
-from .startup import setup_events, setup_commands
-from .service.server import setup_instances
-
 
 def run(config_file: str):
     Config(config_file)
+
+    from .backend.data_reader import DataReader
+    from .backend.database import Database
+    from .backend.logging import start_log
+    from .interaction import Interactions
+    from .backend.cache import CacheStatus
+    from . import commands
+    from .api_server import app as api_app, ApplicationContext
+    from .startup import setup_events, setup_commands
+    from .service.server import setup_instances
+
+    print, error = start_log("main")
+
     Database(Config.instance.database_file)
     DataReader(Config.instance.data_path)
     CacheStatus()
@@ -71,10 +74,10 @@ def run(config_file: str):
             except (SystemExit, KeyboardInterrupt) as e:
                 shutdown(repr(e))
             except Exception as e:
-                print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
+                error(e)
                 err = e
             except BaseException as be:
-                print("".join(traceback.format_exception(type(be), be, be.__traceback__)))
+                error(be)
                 err = be
         except Exception: pass
 

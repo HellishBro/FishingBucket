@@ -7,12 +7,15 @@ import re
 from .backend.cache import TTLCache
 from .backend.config import Config
 from .backend.database import Database, GuildPreference, UserAutoproxyPreference, Guild, MessageLink
+from .backend.logging import start_log
 from .backend.models import Proxy
 from .backend.template_utils import Template
 from .backend.dice_environments import global_functions
 from .backend.utils import convert_attachments, normalize_emojis, roll_dice
 from .commands.specific import get_uid
 from .service import Context, Webhook, Attachment, Embed, Channel
+
+print, error = start_log("send_proxy", "-prox")
 
 
 def message_matches_trigger(message: str, triggers: list[str]) -> tuple[bool, str]:
@@ -221,7 +224,10 @@ async def on_user_message(context: Context):
             context.author.id
     ):
         autoproxy_prefs = await Database.instance.get_autoproxy_preference(owner, guild)
+
+        print(f"Message [{hash(context.message)}] trying to match")
         proxied = await get_proxied_messages(context.content, owner, autoproxy_prefs)
+        print(f"Message [{hash(context.message)}] match subroutine completed")
         if proxied:
             logging_channel: Channel | None | Literal[False] = None
             proxy = None
@@ -235,6 +241,7 @@ async def on_user_message(context: Context):
                     try:
                         ctx = await send_proxy_message(proxy, m, context, context.message.attachments, True, i == 0)
                     except Exception as e:
+                        error(e)
                         await context.reply(f"Messages could not be proxied! `{e}`")
                         return
 
@@ -262,7 +269,7 @@ async def on_user_message(context: Context):
                             await logging_channel.send("", [embed])
 
                 except Exception as e:
-                    print("".join(traceback.format_exception(type(e), e, e.__traceback__)))
+                    error(e)
                     if not ctx:
                         await context.reply(f"Messages could not be proxied! `{e}`")
                         return

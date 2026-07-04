@@ -110,7 +110,7 @@ async def parse_command_arguments(clean_string: str, arguments: list[Argument], 
     return results
 
 
-async def get_command_awaitable(context: Context, prefixes: list[str]) -> Coroutine[Any, Any, Any] | None:
+async def get_command_awaitable(context: Context, prefixes: list[str]) -> tuple[tuple[str, list], Coroutine[Any, Any, Any]] | None:
     global session_command_usages
     for prefix in prefixes:
         if context.content.startswith(prefix):
@@ -121,5 +121,5 @@ async def get_command_awaitable(context: Context, prefixes: list[str]) -> Corout
                     if command_part == "" or command_part[0] == " ":
                         arguments = await parse_command_arguments(command_part.strip(), command.arguments, context)
                         session_command_usages += 1
-                        return command_hooks[name, context.platform](context, *arguments)
+                        return (name, arguments), command_hooks[name, context.platform](context, *arguments)
     return None

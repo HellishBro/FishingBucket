@@ -1,10 +1,12 @@
 import asyncio
 import time
+import uuid
 
 import discord
 import fluxer
 
 from ..backend.database import Database
+from ..backend.logging import start_log
 from ..backend.models import Platform
 from ..interaction import Interactions
 from ..send_proxy import on_user_message, edit_proxy_message
@@ -15,6 +17,7 @@ from ..service.discord import Message as DiscordMessage, ReactionActionEvent as 
 from ..backend.config import Config
 from ..commands.generic import get_command_awaitable, ParseError, EarlyExitException
 
+print, error = start_log("bot")
 
 editing_proxy_messages: dict[tuple[int, Platform], tuple[int, Message]] = {} # (user_id, platform) => (channel id, message)
 handled_messages: dict[tuple[int, Platform, str], float] = {} # (message_id, platform, content) => timestamp
@@ -31,8 +34,11 @@ async def message_wrapper(context: Context):
     await asyncio.sleep(1)
     handled_messages.pop((context.id, context.platform, content))
 
+cmd_id = 0
 
 async def handle_message(context: Context):
+    global cmd_id
+
     key = (context.author.id, context.platform)
     if key in editing_proxy_messages and editing_proxy_messages[key][0] == context.message.channel_id:
         msg = editing_proxy_messages[key][1]
@@ -44,9 +50,14 @@ async def handle_message(context: Context):
         return
 
     try:
-        cmd = await get_command_awaitable(context, Config.cfg(context.platform).prefixes)
-        if cmd:
+        maybe = await get_command_awaitable(context, Config.cfg(context.platform).prefixes)
+        if maybe:
+            (cmd_name, args), cmd = maybe
+            start_time = time.time()
+            print(f"command [{cmd_id}] executed `{cmd_name}` with args {args}")
             await cmd
+            print(f"command [{cmd_id}] finished executing (time {(time.time() - start_time) * 1000:.2f}ms)")
+            cmd_id += 1
             return
     except ParseError as e:
         await context.reply(f"Error parsing command: {e.message}.\nUse `{Config.prefix(context.platform)}help` to see command shape.")

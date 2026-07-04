@@ -1,4 +1,5 @@
 config*
+logs/
 *.db*
 data/emojis.json
 .venv/

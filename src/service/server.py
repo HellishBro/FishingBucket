@@ -13,11 +13,13 @@ from .discord import Bot as DiscordBot
 from .fluxer import Bot as FluxerBot
 from ..backend.config import Config
 from ..backend.data_reader import DataReader
+from ..backend.logging import start_log
 from ..backend.models import Platform
 from ..backend.template_utils import Template
 
 type Coro = Callable[..., Coroutine[Any, Any, Any]]
 
+print, error = start_log("server")
 
 class Server[Bot = fluxer.Bot | discord.Bot](ABC):
     bot: Bot

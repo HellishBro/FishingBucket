@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Any, Collection
 import aiosqlite as sql
 import time
@@ -6,7 +7,11 @@ from collections import namedtuple
 from dataclasses import dataclass
 
 from .cache import TTLCache
+from .logging import start_log
 from .models import Proxy, ProxyGroup, ID, Platform
+
+print, error = start_log("database")
+
 
 lst_proxy_fields = ["id", "name", "description", "avatar_url", "trigger", "owner", "times_used", "creation_date", "proxy_group", "nickname", "proxy_forms", "current_form", "pronouns"]
 proxy_fields = ", ".join(lst_proxy_fields)
@@ -118,7 +123,7 @@ class Cache:
 class Database:
     instance: Database
 
-    def __init__(self, database_file: str = "../database.db"):
+    def __init__(self, database_file: str | Path = "../database.db"):
         Database.instance = self
         self.connection: sql.Connection = None
         self.database_file = database_file

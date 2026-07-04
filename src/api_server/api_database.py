@@ -7,7 +7,10 @@ import json
 import secrets
 
 from ..backend.cache import TTLCache
+from ..backend.logging import start_log
 from ..backend.models import Platform
+
+print, error = start_log("database", "-api")
 
 
 @dataclass
