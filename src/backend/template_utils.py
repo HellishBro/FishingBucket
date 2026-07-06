@@ -8,9 +8,12 @@ from pydantic import BaseModel
 
 from .cache import TTLCache
 from .config import Config
+from .logging import start_log
 
 if TYPE_CHECKING:
     from ..service import Context
+
+print, error = start_log("template", "-template")
 
 
 @dataclass
@@ -138,7 +141,7 @@ class Template:
                 return True, result
             return False, ""
         except Exception as e:
-            print(e)
+            error(e)
             return False, ""
 
     def _match(self, part_index: int, string: str, string_index: int, previous_match: str, parts: list[TemplatePart]) -> MatchedResult:
@@ -209,9 +212,11 @@ class Template:
         elif d is None: return d
         elif isinstance(d, (tuple, list)):
             return [self.make_value(v) for v in d]
+        elif isinstance(d, BaseModel):
+            return self.make_value(d.model_dump(mode="json"))
         elif isinstance(d, dict):
             return {k: self.make_value(v) for k, v in d.items()}
-        return self.make_value({k: v for k, v in d.__dict__.items() if not (k.startswith("_") or k.endswith("_"))})
+        raise Exception(f"unknown data type {d.__class__.__name__}")
 
     def map_variables(self, variables: dict) -> dict:
         parsed = {}

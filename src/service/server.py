@@ -38,7 +38,7 @@ class Server[Bot = fluxer.Bot | discord.Bot](ABC):
                 config = Config.instance
                 parsed = Template.from_string(tip).compute({
                     "prefix": config.fluxer.prefixes[0],
-                    "config": config.__dict__,
+                    "config": config,
                     "platform": "Fluxer"
                 }, "")
 
