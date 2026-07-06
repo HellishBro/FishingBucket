@@ -3,7 +3,7 @@ import asyncio
 import aiohttp
 import sys
 
-RAW_URL = "https://raw.githubusercontent.com/fluxerapp/fluxer/refs/heads/refactor/fluxer_app/src/data/emojis.json"
+RAW_URL = "https://github.com/fluxerapp/fluxer/blob/2026.703.173023/fluxer_app/src/media/data/emojis.json"
 
 print("Downloading emoji data...")
 async def download_data() -> dict | None:
@@ -27,7 +27,7 @@ type Emoji = str
 forward_map: dict[EmojiName, Emoji] = {}
 backward_map: dict[Emoji, list[EmojiName]] = {}
 
-for category, emoji_list in raw_emojis.items():
+for category, emoji_list in raw_emojis["categories"].items():
     print(f"Parsing category {category}...")
     for item in emoji_list:
         for name in item["names"]:

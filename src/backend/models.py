@@ -50,7 +50,7 @@ class Proxy:
 
     @staticmethod
     def random_avatar() -> str:
-        return f"https://raw.githubusercontent.com/fluxerapp/static/refs/heads/main/avatars/{random.randint(0, 5)}.png"
+        return f"https://raw.githubusercontent.com/fluxerapp/fluxer/refs/tags/2026.703.173023/fluxer_static/avatars/{random.randint(0, 5)}.png"
 
     @classmethod
     def from_database(cls, data: tuple[int, str, str, str, str, int, int, float, int | None, str | None, str | None, str | None, str | None], groups: list[ProxyGroup]) -> Proxy:
