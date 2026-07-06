@@ -54,6 +54,7 @@ class UtterImporter(Importer):
             ).strip() or "",
             None
         )
+        self.groups.append(default_group)
 
         members_map: dict[str, Proxy] = {}
 

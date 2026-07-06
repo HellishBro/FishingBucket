@@ -67,6 +67,7 @@ class PluralKitImporter(Importer):
             ) if root.tag else "",
             None
         )
+        self.groups.append(default_group)
 
         members_map: dict[str, Proxy] = {}
 

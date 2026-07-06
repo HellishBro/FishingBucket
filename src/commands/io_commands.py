@@ -7,8 +7,11 @@ from .generic import hook_command
 from .specific import get_uid
 from ..backend.database import Database
 from ..backend.import_system import NativeImporter, TupperboxImporter, PluralKitImporter, UtterImporter, NativeExporter
+from ..backend.logging import start_log
 from ..backend.models import ProxyGroup, Proxy
 from ..service import Context, Embed, File
+
+print, error = start_log("im/exporter")
 
 
 def setup():
@@ -67,6 +70,7 @@ def setup():
         try:
             cls.import_data(contents, owner)
         except (json.JSONDecodeError, pydantic.ValidationError) as e:
+            error(e)
             await confirmation.reply(f"Error: cannot parse file")
             return
 

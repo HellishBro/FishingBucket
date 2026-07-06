@@ -51,6 +51,7 @@ class NativeImporter(Importer):
                 group.tag,
                 None
             )
+            self.groups.append(g)
             parsed_groups[idx] = g
             groups_queue[idx] = group
 
