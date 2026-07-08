@@ -67,12 +67,6 @@ class Config_(BaseModel):
             return self.discord
         return None
 
-    def prefix(self) -> str:
-        return self.instance.prefixes[0]
-
-    def name(self) -> str:
-        return self.instance.name
-
 
 class Config:
     instance: Config_

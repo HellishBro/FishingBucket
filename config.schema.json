@@ -1,0 +1,259 @@
+{
+  "$defs": {
+    "ApiServer": {
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "domain": {
+          "title": "Domain",
+          "type": "string"
+        },
+        "port": {
+          "title": "Port",
+          "type": "integer"
+        },
+        "database": {
+          "format": "file-path",
+          "title": "Database",
+          "type": "string"
+        },
+        "fluxer": {
+          "$ref": "#/$defs/ApiServerPlatformConfig"
+        },
+        "discord": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApiServerPlatformConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "enabled",
+        "domain",
+        "port",
+        "database",
+        "fluxer"
+      ],
+      "title": "ApiServer",
+      "type": "object"
+    },
+    "ApiServerPlatformConfig": {
+      "properties": {
+        "client_id": {
+          "title": "Client Id",
+          "type": "integer"
+        },
+        "client_secret": {
+          "title": "Client Secret",
+          "type": "string"
+        }
+      },
+      "required": [
+        "client_id",
+        "client_secret"
+      ],
+      "title": "ApiServerPlatformConfig",
+      "type": "object"
+    },
+    "PlatformConfig": {
+      "properties": {
+        "token": {
+          "title": "Token",
+          "type": "string"
+        },
+        "guild_invite": {
+          "title": "Guild Invite",
+          "type": "string"
+        },
+        "guild_id": {
+          "title": "Guild Id",
+          "type": "integer"
+        },
+        "bot_invite": {
+          "title": "Bot Invite",
+          "type": "string"
+        },
+        "client_id": {
+          "title": "Client Id",
+          "type": "integer"
+        },
+        "api_url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Api Url",
+          "type": "string"
+        },
+        "prefixes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Prefixes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "token",
+        "guild_invite",
+        "guild_id",
+        "bot_invite",
+        "client_id",
+        "api_url",
+        "prefixes"
+      ],
+      "title": "PlatformConfig",
+      "type": "object"
+    },
+    "WebsiteConfig": {
+      "properties": {
+        "dashboard": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Dashboard",
+          "type": "string"
+        },
+        "home": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Home",
+          "type": "string"
+        },
+        "terms": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Terms",
+          "type": "string"
+        },
+        "privacy": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Privacy",
+          "type": "string"
+        },
+        "contact": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Contact",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dashboard",
+        "home",
+        "terms",
+        "privacy",
+        "contact"
+      ],
+      "title": "WebsiteConfig",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "fluxer": {
+      "$ref": "#/$defs/PlatformConfig"
+    },
+    "discord": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlatformConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "database_file": {
+      "format": "file-path",
+      "title": "Database File",
+      "type": "string"
+    },
+    "data_path": {
+      "format": "directory-path",
+      "title": "Data Path",
+      "type": "string"
+    },
+    "webhook": {
+      "title": "Webhook",
+      "type": "string"
+    },
+    "log_directory": {
+      "format": "directory-path",
+      "title": "Log Directory",
+      "type": "string"
+    },
+    "log_time_format": {
+      "title": "Log Time Format",
+      "type": "string"
+    },
+    "use_extras": {
+      "default": false,
+      "title": "Use Extras",
+      "type": "boolean"
+    },
+    "donation": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Donation"
+    },
+    "api_server": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ApiServer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "website": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WebsiteConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "fluxer",
+    "name",
+    "database_file",
+    "data_path",
+    "webhook",
+    "log_directory",
+    "log_time_format"
+  ],
+  "title": "Config_",
+  "type": "object"
+}

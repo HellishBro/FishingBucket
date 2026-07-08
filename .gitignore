@@ -9,3 +9,4 @@ uv.lock
 build/
 */__pycache__
 *.egg-info
+!config.schema.json
