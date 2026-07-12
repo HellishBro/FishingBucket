@@ -6,7 +6,7 @@ from textdistance import damerau_levenshtein as edit_distance
 from .generic import hook_command
 from .specific import get_uid
 from .utils import example_trigger_text, paged_proxy_list, get_proxies_text
-from ..backend.database import Database, MessageLink
+from ..backend.database import Database, MessageLink, AUTOPROXY_NORMAL, AUTOPROXY_USE_SPOTLIGHT
 from ..backend import database as db
 from ..backend.models import Proxy
 from ..backend.template_utils import Template
@@ -156,7 +156,7 @@ def setup():
 
 
     @hook_command("autoproxy")
-    async def _(context: Context, setting: Proxy | Literal["latch"] | bool, mode: Literal["global"] | Literal["community"] | None, expires: timedelta | Literal["never"]):
+    async def _(context: Context, setting: Proxy | Literal["latch"] | Literal["spotlight"] | bool, mode: Literal["global"] | Literal["community"] | None, expires: timedelta | Literal["never"]):
         if setting == "latch":
             setting = True
 
@@ -177,6 +177,10 @@ def setup():
         if setting is True:
             await Database.instance.set_autoproxy_preference(uid, guild, None, expiration)
             await context.reply(f"Autoproxy has been set to latch mode {postfix}.")
+        elif setting == "spotlight":
+            await Database.instance.set_autoproxy_preference(uid, guild, None, expiration, AUTOPROXY_USE_SPOTLIGHT)
+            await context.reply(f"Autoproxy has been set to first spotlight proxy {postfix}.")
+
         elif setting is False:
             if mode is None:
                 await Database.instance.remove_all_autoproxy_preference(uid)

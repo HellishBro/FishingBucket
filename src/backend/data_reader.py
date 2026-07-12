@@ -13,14 +13,20 @@ class DataReader:
         self.loaded_files: dict[str, Any] = {}
         self.load_data()
 
+    def load_data_directory(self, directory: Path, relative: str):
+        for file in os.listdir(directory):
+            if os.path.isdir(directory / file):
+                self.load_data_directory(directory / file, relative + file + "/")
+            else:
+                with open(directory / file) as f:
+                    if file.endswith(".json"):
+                        self.loaded_files[relative + file] = json.loads(f.read())
+                    else:
+                        self.loaded_files[relative + file] = f.read()
+
     def load_data(self):
         self.loaded_files = {}
-        for file in os.listdir(self.data_directory):
-            with open(self.data_directory / file) as f:
-                if file.endswith(".json"):
-                    self.loaded_files[file] = json.loads(f.read())
-                else:
-                    self.loaded_files[file] = f.read()
+        self.load_data_directory(self.data_directory, "")
 
     def __getitem__(self, item: str) -> Any:
         if item in self.loaded_files:

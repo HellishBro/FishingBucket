@@ -1,4 +1,3 @@
-import traceback
 from typing import Literal
 
 import expr_dice_roller as dice
@@ -6,7 +5,8 @@ import re
 
 from .backend.cache import TTLCache
 from .backend.config import Config
-from .backend.database import Database, GuildPreference, UserAutoproxyPreference, Guild, MessageLink
+from .backend.database import Database, GuildPreference, UserAutoproxyPreference, Guild, MessageLink, \
+    AUTOPROXY_USE_SPOTLIGHT
 from .backend.logging import start_log
 from .backend.models import Proxy
 from .backend.template_utils import Template
@@ -35,13 +35,27 @@ async def get_proxy_from_message(message: str, user_proxies: list[Proxy]) -> tup
                 return proxy, res[1]
     return None
 
+
+async def get_first_spotlight_proxies(uid: int) -> Proxy | None:
+    user_settings = await Database.instance.get_user_preferences(uid)
+    spotlights = user_settings.spotlight
+    if spotlights:
+        return await Database.instance.get_proxy(spotlights[0])
+
+    return None
+
+
+
 async def get_proxied_messages(message: str, user_id: int, autoproxy_preferences: UserAutoproxyPreference | None) -> list[tuple[Proxy, str]]:
     res: list[tuple[Proxy, str]] = []
     autoproxy_proxy = None
     user_proxies = await Database.instance.get_user_proxies(user_id)
     if autoproxy_preferences and not autoproxy_preferences.expires_now():
-        prox_id = autoproxy_preferences.proxy if autoproxy_preferences.proxy is not None else autoproxy_preferences.last_used_proxy
-        autoproxy_proxy = await Database.instance.get_proxy(prox_id)
+        if (autoproxy_preferences.flags & AUTOPROXY_USE_SPOTLIGHT) == AUTOPROXY_USE_SPOTLIGHT:
+            autoproxy_proxy = await get_first_spotlight_proxies(user_id)
+        else:
+            prox_id = autoproxy_preferences.proxy if autoproxy_preferences.proxy is not None else autoproxy_preferences.last_used_proxy
+            autoproxy_proxy = await Database.instance.get_proxy(prox_id)
     for line in message.split("\n"):
         if proxy_m := await get_proxy_from_message(line, user_proxies):
             res.append(proxy_m)

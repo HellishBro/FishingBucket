@@ -141,6 +141,7 @@ class Template:
                 return True, result
             return False, ""
         except Exception as e:
+            print(f"{expression=}, {variables=}")
             error(e)
             return False, ""
 

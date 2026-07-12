@@ -38,7 +38,8 @@ def upsert_query(table: str, key: str | Collection[str], key_check: Any | Collec
     params = tuple(key_checks) + tuple(defaults) + tuple(values) + tuple(key_checks)
     return sql_str, params
 
-class UserPreference(namedtuple("UserPreference", "private_description private_trigger private_metadata private_group private_list private_forms dice_functions private_pronouns")):
+@dataclass
+class UserPreference:
     private_description: bool
     private_trigger: bool
     private_metadata: bool
@@ -47,6 +48,19 @@ class UserPreference(namedtuple("UserPreference", "private_description private_t
     private_forms: bool
     dice_functions: bytes
     private_pronouns: bool
+    spotlight: list[int]
+
+    @classmethod
+    def from_database(cls, row: list) -> UserPreference:
+        return UserPreference(*row[0:8], json.loads(row[8] or "[]"))
+
+    def to_database(self) -> tuple[bool, bool, bool, bool, bool, bool, bytes, bool, str]:
+        tup = self.as_tuple()
+        return tup[0:8] + (json.dumps(tup[8]),)
+
+    def as_tuple(self) -> tuple[bool, bool, bool, bool, bool, bool, bytes, bool, list[int]]:
+        return (self.private_description, self.private_trigger, self.private_metadata, self.private_group,
+                self.private_list, self.private_forms, self.dice_functions, self.private_pronouns, self.spotlight)
 
     @property
     def public_description(self) -> bool: return not self.private_description
@@ -85,11 +99,16 @@ class Guild(namedtuple("Guild", "guild_id guild_type")):
     guild_id: int
     guild_type: Platform
 
+AUTOPROXY_NORMAL = 0
+AUTOPROXY_USE_SPOTLIGHT = 1
+
 @dataclass # it's better if this is mutable for caching
 class UserAutoproxyPreference:
+    matched_guild: Guild
     proxy: int | None
     last_used_proxy: int | None
     expires: float
+    flags: int
 
     def expires_now(self) -> bool:
         return self.expires != 0 and self.expires < time.time()
@@ -147,8 +166,23 @@ class Database:
         await self.connection.commit()
 
     async def migrate(self):
-        version = (await self.get_global_stats()).get("version", 0)
-        await self.set_global_data("version", str(version), version)
+        version = int((await self.get_global_stats()).get("version", 0))
+        migrations_data = DataReader.instance["migrations/stats.json"]
+        while str(version) in migrations_data:
+            data_file = migrations_data[str(version)]
+            if data_file == "unsupported":
+                error(ValueError(f"Migrating from version {version} is now unsupported."))
+                return
+            migration_script = DataReader.instance[data_file]
+            try:
+                print(f"Migrating to version {version + 1}")
+                await self.connection.executescript(migration_script)
+            except Exception as e:
+                error(e)
+                return
+            version += 1
+
+        print(f"Finished migrating to version {int((await self.get_global_stats()).get("version", 0))}")
 
     async def get_user_id(self, sso: int, platform: Platform = Platform.Fluxer, create: bool = True) -> int:
         if dat := Cache.user_id.get((sso, platform)):
@@ -208,7 +242,7 @@ class Database:
             return ref
 
         async with self.connection.execute(
-            "SELECT proxy, last_used_proxy, expires FROM autoproxies WHERE guild_id = ? AND guild_type = ? AND user_id = ?",
+            "SELECT proxy, last_used_proxy, expires, flags FROM autoproxies WHERE guild_id = ? AND guild_type = ? AND user_id = ?",
                 (guild.guild_id, guild.guild_type.get(), user_id)
         ) as cursor:
             row = await cursor.fetchone()
@@ -217,7 +251,7 @@ class Database:
                     return await self.get_autoproxy_preference(user_id, Guild(0, guild.guild_type))
                 Cache.autoproxy_preferences.set((user_id, guild), None)
                 return None
-            preferences = UserAutoproxyPreference(*row)
+            preferences = UserAutoproxyPreference(guild, *row)
             if preferences.expires_now():
                 await self.remove_autoproxy_preference(user_id, guild)
                 if guild.guild_id != 0:
@@ -226,10 +260,10 @@ class Database:
             Cache.autoproxy_preferences.set((user_id, guild), preferences)
             return preferences
 
-    async def set_autoproxy_preference(self, user_id: int, guild: Guild, proxy: int | None, expires: int | None):
+    async def set_autoproxy_preference(self, user_id: int, guild: Guild, proxy: int | None, expires: int | None, flags: int = AUTOPROXY_NORMAL):
         await self.connection.execute(
-            "INSERT OR REPLACE INTO autoproxies (guild_id, user_id, proxy, last_used_proxy, expires, guild_type) VALUES (?, ?, ?, ?, ?, ?)",
-            (guild.guild_id, user_id, proxy, None, (time.time() + expires) if expires else 0, guild.guild_type.get())
+            "INSERT OR REPLACE INTO autoproxies (guild_id, user_id, proxy, last_used_proxy, expires, guild_type, flags) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (guild.guild_id, user_id, proxy, None, (time.time() + expires) if expires else 0, guild.guild_type.get(), flags)
         )
         await self.connection.commit()
         Cache.autoproxy_preferences.invalidate((user_id, guild))
@@ -263,8 +297,11 @@ class Database:
             private_list: bool | None = None,
             private_forms: bool | None = None,
             dice_functions: bytes | None = None,
-            private_pronouns: bool | None = None
+            private_pronouns: bool | None = None,
+            spotlight: list[int] | None = None
     ):
+        spotlight = json.dumps(spotlight)
+
         names = {
             "private_description": (private_description, False),
             "private_trigger": (private_trigger, False),
@@ -273,7 +310,8 @@ class Database:
             "private_list": (private_list, False),
             "private_forms": (private_forms, False),
             "dice_functions": (dice_functions, b""),
-            "private_pronouns": (private_pronouns, False)
+            "private_pronouns": (private_pronouns, False),
+            "spotlight": (spotlight, "[]")
         }
         changes = [k for k, (v, _) in names.items() if v is not None]
         values = [v for v, _ in names.values() if v is not None]
@@ -282,8 +320,8 @@ class Database:
             return
 
         prefs = await self.get_user_preferences(user_id)
-        true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, private_forms, dice_functions, private_pronouns)
-        true_compare_list = tuple((a if a is not None else b for a, b in zip(true_compare_list, prefs)))
+        true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, private_forms, dice_functions, private_pronouns, spotlight)
+        true_compare_list = tuple((a if a is not None else b for a, b in zip(true_compare_list, prefs.to_database())))
         if prefs != true_compare_list:
             await self.connection.execute(*upsert_query("user_settings", "user_id", user_id, names, changes, values))
             await self.connection.commit()
@@ -296,8 +334,8 @@ class Database:
                 (user_id, )
         ) as cursor:
             res = await cursor.fetchone()
-            if not res: return UserPreference(False, False, False, False, False, False, b"", False)
-            else: return UserPreference(*res[1:])
+            if not res: return UserPreference(False, False, False, False, False, False, b"", False, [])
+            else: return UserPreference.from_database(res[1:])
 
     @Cache.latest_proxy_message_from_user.cache_async()
     async def get_latest_proxy_message_from_user(self, channel_id: int, owner: int, platform: Platform) -> int | None:

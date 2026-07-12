@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS proxies (
     creation_date REAL,
     proxy_group INTEGER,
     nickname TEXT,
-    proxy_forms TEXT,
+    proxy_forms TEXT, -- {str: url}
     current_form TEXT,
     pronouns TEXT
 );
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS global_stats (
     key TEXT PRIMARY KEY,
     value REAL
 );
-INSERT OR IGNORE INTO global_stats (key, value) VALUES ('version', 14);
+INSERT OR IGNORE INTO global_stats (key, value) VALUES ('version', 15);
 
 CREATE TABLE IF NOT EXISTS permission_overrides (
     id INTEGER,
@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
     private_list BOOLEAN,
     private_forms BOOLEAN,
     dice_functions BLOB,
-    private_pronouns BOOLEAN
+    private_pronouns BOOLEAN,
+    spotlight TEXT -- [proxy id]
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -94,6 +95,7 @@ CREATE TABLE IF NOT EXISTS autoproxies (
     last_used_proxy INTEGER,
     expires REAL,
     guild_type INTEGER,
+    flags INTEGER,
     PRIMARY KEY (guild_id, user_id, guild_type)
 );
 

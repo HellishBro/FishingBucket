@@ -164,6 +164,7 @@ def setup():
             """
             Automatically proxies your messages.
             Autoproxy set to `true` or `latch` will proxy your messages as your last used proxy.
+            Autoproxy set to `latch` will proxy your messages as the first proxy in your spotlight.
             If `target` is a proxy, all messages will be sent as that proxy.
             You can still use proxies normally. Any explicit proxy message will override the autoproxy for that message only.
             If `expiration` is set, then the autoproxy will automatically expire after `expiration` seconds.
@@ -172,9 +173,10 @@ def setup():
                 Argument(
                     "setting",
                     OneOf(
-                        Literal(
-                            "latch"
-                        ),
+                        OptionList(None, {
+                            "latch": ["l"],
+                            "spotlight": ["spot", "front"]
+                        }),
                         bool,
                         ProxyStrategy()
                     )
