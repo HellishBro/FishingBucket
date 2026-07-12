@@ -51,7 +51,7 @@ async def get_proxied_messages(message: str, user_id: int, autoproxy_preferences
     autoproxy_proxy = None
     user_proxies = await Database.instance.get_user_proxies(user_id)
     if autoproxy_preferences and not autoproxy_preferences.expires_now():
-        if (autoproxy_preferences.flags & AUTOPROXY_USE_SPOTLIGHT) == AUTOPROXY_USE_SPOTLIGHT:
+        if (autoproxy_preferences.get_flags() & AUTOPROXY_USE_SPOTLIGHT) == AUTOPROXY_USE_SPOTLIGHT:
             autoproxy_proxy = await get_first_spotlight_proxies(user_id)
         else:
             prox_id = autoproxy_preferences.proxy if autoproxy_preferences.proxy is not None else autoproxy_preferences.last_used_proxy

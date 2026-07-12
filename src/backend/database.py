@@ -112,10 +112,13 @@ class UserAutoproxyPreference:
     proxy: int | None
     last_used_proxy: int | None
     expires: float
-    flags: int
+    flags: int | None
 
     def expires_now(self) -> bool:
         return self.expires != 0 and self.expires < time.time()
+
+    def get_flags(self) -> int:
+        return self.flags or 0
 
 class Cache:
     LONG = 3600
