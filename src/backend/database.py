@@ -49,18 +49,19 @@ class UserPreference:
     dice_functions: bytes
     private_pronouns: bool
     spotlight: list[int]
+    private_spotlight: bool
 
     @classmethod
     def from_database(cls, row: list) -> UserPreference:
-        return UserPreference(*row[0:8], json.loads(row[8] or "[]"))
+        return UserPreference(*row[0:8], json.loads(row[8] or "[]"), *row[9:])
 
-    def to_database(self) -> tuple[bool, bool, bool, bool, bool, bool, bytes, bool, str]:
+    def to_database(self) -> tuple[bool, bool, bool, bool, bool, bool, bytes, bool, str, bool]:
         tup = self.as_tuple()
-        return tup[0:8] + (json.dumps(tup[8]),)
+        return tup[0:8] + (json.dumps(tup[8]),) + tup[9:]
 
-    def as_tuple(self) -> tuple[bool, bool, bool, bool, bool, bool, bytes, bool, list[int]]:
+    def as_tuple(self) -> tuple[bool, bool, bool, bool, bool, bool, bytes, bool, list[int], bool]:
         return (self.private_description, self.private_trigger, self.private_metadata, self.private_group,
-                self.private_list, self.private_forms, self.dice_functions, self.private_pronouns, self.spotlight)
+                self.private_list, self.private_forms, self.dice_functions, self.private_pronouns, self.spotlight, self.private_spotlight)
 
     @property
     def public_description(self) -> bool: return not self.private_description
@@ -82,6 +83,9 @@ class UserPreference:
 
     @property
     def public_pronouns(self) -> bool: return not self.private_pronouns
+
+    @property
+    def public_spotlight(self) -> bool: return not self.private_spotlight
 
 
 class GuildPreference(namedtuple("GuildPreference", "disallow_by_default logging_channel dice_functions guild_type")):
@@ -298,7 +302,8 @@ class Database:
             private_forms: bool | None = None,
             dice_functions: bytes | None = None,
             private_pronouns: bool | None = None,
-            spotlight: list[int] | None = None
+            spotlight: list[int] | None = None,
+            private_spotlight: bool | None = None
     ):
         spotlight = json.dumps(spotlight)
 
@@ -311,7 +316,8 @@ class Database:
             "private_forms": (private_forms, False),
             "dice_functions": (dice_functions, b""),
             "private_pronouns": (private_pronouns, False),
-            "spotlight": (spotlight, "[]")
+            "spotlight": (spotlight, "[]"),
+            "private_spotlight": (private_spotlight, False)
         }
         changes = [k for k, (v, _) in names.items() if v is not None]
         values = [v for v, _ in names.values() if v is not None]
@@ -320,7 +326,7 @@ class Database:
             return
 
         prefs = await self.get_user_preferences(user_id)
-        true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, private_forms, dice_functions, private_pronouns, spotlight)
+        true_compare_list = (private_description, private_trigger, private_metadata, private_group, private_list, private_forms, dice_functions, private_pronouns, spotlight, private_spotlight)
         true_compare_list = tuple((a if a is not None else b for a, b in zip(true_compare_list, prefs.to_database())))
         if prefs != true_compare_list:
             await self.connection.execute(*upsert_query("user_settings", "user_id", user_id, names, changes, values))
@@ -334,7 +340,7 @@ class Database:
                 (user_id, )
         ) as cursor:
             res = await cursor.fetchone()
-            if not res: return UserPreference(False, False, False, False, False, False, b"", False, [])
+            if not res: return UserPreference(False, False, False, False, False, False, b"", False, [], False)
             else: return UserPreference.from_database(res[1:])
 
     @Cache.latest_proxy_message_from_user.cache_async()

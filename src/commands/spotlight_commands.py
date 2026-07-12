@@ -56,7 +56,12 @@ def setup():
         uid = await get_uid(context)
         proxies = await get_spotlight_proxies(uid, True)
         channel = await context.get_this_channel()
-        await paged_proxy_list(context, proxies, f"Spotlight of {context.author.display_name}", 0, channel.dm)
+        preferences = await Database.get_user_preferences(uid)
+        if preferences.public_spotlight or channel.dm:
+            await paged_proxy_list(context, proxies, f"Spotlight of {context.author.display_name}", 0, channel.dm)
+        else:
+            # TODO: add actual behavior
+            pass
 
     @hook_command("spotlight set")
     async def _(context: Context, proxies: list[Proxy]):

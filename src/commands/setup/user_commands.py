@@ -26,6 +26,7 @@ def setup():
             - Proxy groups (`groups`)
             - Proxy forms (`forms`)
             - Proxy pronouns (`pronouns`)
+            - Spotlight (`spotlight`)
             - Or, simply viewing your proxies and groups at all (`list`)
             
             Using proxy or group list commands in bot DMs will show private fields.
@@ -53,6 +54,7 @@ def setup():
             - Proxy groups (`groups`)
             - Proxy forms (`forms`)
             - Proxy pronouns (`pronouns`)
+            - Spotlight (`spotlight`)
             - Or, simply viewing your proxies and groups at all (`list`)
             
             Using proxy or group list commands in bot DMs will show private fields.
@@ -82,7 +84,8 @@ def setup():
                                     "groups",
                                     "forms",
                                     "list",
-                                    "pronouns"
+                                    "pronouns",
+                                    "spotlight"
                                 ]
                             )
                         )

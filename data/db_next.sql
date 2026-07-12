@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
     private_forms BOOLEAN,
     dice_functions BLOB,
     private_pronouns BOOLEAN,
-    spotlight TEXT -- [proxy id]
+    spotlight TEXT, -- [proxy id]
+    private_spotlight BOOLEAN
 );
 
 CREATE TABLE IF NOT EXISTS users (
